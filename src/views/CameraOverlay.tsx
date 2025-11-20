@@ -21,10 +21,26 @@ const CameraOverlay = () => {
 
         startCamera();
 
+        // Cleanup function to stop camera stream
+        return () => {
+            if (videoRef.current?.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
+
+    useEffect(() => {
         if (window.electronAPI) {
-            window.electronAPI.onCameraShapeChange((newShape) => {
+            const handleShapeChange = (newShape: string) => {
                 setShape(newShape);
-            });
+            };
+            
+            // Register listener
+            window.electronAPI.onCameraShapeChange(handleShapeChange);
+            
+            // Note: In Electron with contextBridge, listeners are automatically cleaned up
+            // but we can't manually remove them. The listener will persist for the window lifetime.
         }
     }, []);
 

@@ -17,6 +17,8 @@ function createControlWindow() {
         height: 600,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
         },
     });
     if (VITE_DEV_SERVER_URL) {
@@ -39,6 +41,8 @@ function createCameraWindow() {
         resizable: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
         },
     });
     if (VITE_DEV_SERVER_URL) {
@@ -58,6 +62,8 @@ function createTeleprompterWindow() {
         hasShadow: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
         },
     });
     // CRITICAL: Hide from screen capture
@@ -93,7 +99,9 @@ app.whenReady().then(() => {
         }));
     });
     ipcMain.on('set-camera-shape', (_, shape) => {
+        console.log('Received set-camera-shape:', shape);
         if (cameraWindow) {
+            console.log('Sending camera-shape-changed to camera window');
             cameraWindow.webContents.send('camera-shape-changed', shape);
             // Optional: Resize window if needed based on shape
             if (shape === 'circle') {
@@ -107,13 +115,22 @@ app.whenReady().then(() => {
                 cameraWindow.setSize(300, 300);
             }
         }
+        else {
+            console.error('Camera window is null');
+        }
     });
     ipcMain.on('set-teleprompter-text', (_, text) => {
+        console.log('Received set-teleprompter-text:', text.substring(0, 50) + '...');
         if (teleprompterWindow) {
+            console.log('Sending teleprompter-text-changed to teleprompter window');
             teleprompterWindow.webContents.send('teleprompter-text-changed', text);
+        }
+        else {
+            console.error('Teleprompter window is null');
         }
     });
     ipcMain.on('set-camera-size', (_, size) => {
+        console.log('Received set-camera-size:', size);
         if (cameraWindow) {
             let width = 300;
             let height = 300;
@@ -131,7 +148,11 @@ app.whenReady().then(() => {
                     height = 450;
                     break;
             }
+            console.log(`Resizing camera window to ${width}x${height}`);
             cameraWindow.setSize(width, height);
+        }
+        else {
+            console.error('Camera window is null');
         }
     });
     ipcMain.handle('save-recording', async (_, buffer) => {

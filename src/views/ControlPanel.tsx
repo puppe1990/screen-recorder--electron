@@ -23,26 +23,46 @@ const ControlPanel = () => {
 
     const startRecording = async () => {
         try {
+            if (!selectedSourceId) {
+                console.error('No source selected');
+                return;
+            }
+
+            // In Electron, we need to use the correct constraints format
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
+                    // @ts-ignore - Electron-specific constraints
                     mandatory: {
                         chromeMediaSource: 'desktop',
                         chromeMediaSourceId: selectedSourceId,
-                    },
+                        minWidth: 1280,
+                        maxWidth: 1920,
+                        minHeight: 720,
+                        maxHeight: 1080
+                    }
                 } as any,
             });
 
-            const mediaRecorder = new MediaRecorder(stream);
+            const mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 2500000
+            });
+            
             mediaRecorderRef.current = mediaRecorder;
             chunksRef.current = [];
 
             mediaRecorder.ondataavailable = (e) => {
-                chunksRef.current.push(e.data);
+                if (e.data && e.data.size > 0) {
+                    chunksRef.current.push(e.data);
+                }
             };
 
             mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunksRef.current, { type: 'video/webm; codecs=vp9' });
+                const blob = new Blob(chunksRef.current, { type: 'video/webm;codecs=vp9' });
+
+                // Stop all tracks to release resources
+                stream.getTracks().forEach(track => track.stop());
 
                 if (window.electronAPI) {
                     const buffer = await blob.arrayBuffer();
@@ -60,15 +80,22 @@ const ControlPanel = () => {
                 }
             };
 
-            mediaRecorder.start();
+            mediaRecorder.onerror = (e) => {
+                console.error('MediaRecorder error:', e);
+                setIsRecording(false);
+            };
+
+            mediaRecorder.start(1000); // Collect data every second
             setIsRecording(true);
         } catch (e) {
             console.error('Failed to start recording:', e);
+            alert(`Erro ao iniciar gravação: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
+            setIsRecording(false);
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current) {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
         }
@@ -152,7 +179,14 @@ const ControlPanel = () => {
                                 {['circle', 'square', 'rounded'].map((shape) => (
                                     <button
                                         key={shape}
-                                        onClick={() => window.electronAPI?.setCameraShape(shape)}
+                                        onClick={() => {
+                                            console.log('Setting camera shape to:', shape);
+                                            if (window.electronAPI) {
+                                                window.electronAPI.setCameraShape(shape);
+                                            } else {
+                                                console.error('electronAPI not available');
+                                            }
+                                        }}
                                         className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize"
                                     >
                                         {shape}
@@ -170,7 +204,14 @@ const ControlPanel = () => {
                                 {['small', 'medium', 'large'].map((size) => (
                                     <button
                                         key={size}
-                                        onClick={() => window.electronAPI?.setCameraSize(size)}
+                                        onClick={() => {
+                                            console.log('Setting camera size to:', size);
+                                            if (window.electronAPI) {
+                                                window.electronAPI.setCameraSize(size);
+                                            } else {
+                                                console.error('electronAPI not available');
+                                            }
+                                        }}
                                         className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize"
                                     >
                                         {size}
@@ -188,8 +229,12 @@ const ControlPanel = () => {
                                 className="w-full bg-gray-900/80 border border-gray-700 rounded-xl p-4 text-white h-40 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none resize-none"
                                 placeholder="Enter your script here..."
                                 onChange={(e) => {
+                                    const text = e.target.value;
+                                    console.log('Setting teleprompter text:', text.substring(0, 50) + '...');
                                     if (window.electronAPI) {
-                                        window.electronAPI.setTeleprompterText(e.target.value);
+                                        window.electronAPI.setTeleprompterText(text);
+                                    } else {
+                                        console.error('electronAPI not available');
                                     }
                                 }}
                             />

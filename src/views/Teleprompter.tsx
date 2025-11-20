@@ -5,9 +5,15 @@ const Teleprompter = () => {
 
   useEffect(() => {
     if (window.electronAPI) {
-      window.electronAPI.onTeleprompterTextChange((newText) => {
+      const handleTextChange = (newText: string) => {
         setText(newText);
-      });
+      };
+      
+      // Register listener
+      window.electronAPI.onTeleprompterTextChange(handleTextChange);
+      
+      // Note: In Electron with contextBridge, listeners are automatically cleaned up
+      // but we can't manually remove them. The listener will persist for the window lifetime.
     }
   }, []);
 
