@@ -1,55 +1,55 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const electron_1 = require("electron");
-const path_1 = __importDefault(require("path"));
-process.env.DIST = path_1.default.join(__dirname, '../dist');
-process.env.VITE_PUBLIC = electron_1.app.isPackaged ? process.env.DIST : path_1.default.join(process.env.DIST, '../public');
+import { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog } from 'electron';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+process.env.DIST = path.join(__dirname, '../dist');
+process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
+const DIST_PATH = process.env.DIST;
 let controlWindow;
 let cameraWindow;
 let teleprompterWindow;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 function createControlWindow() {
-    controlWindow = new electron_1.BrowserWindow({
+    controlWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
         },
     });
     if (VITE_DEV_SERVER_URL) {
         controlWindow.loadURL(VITE_DEV_SERVER_URL);
     }
     else {
-        controlWindow.loadFile(path_1.default.join(process.env.DIST, 'index.html'));
+        controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
     }
 }
 function createCameraWindow() {
-    cameraWindow = new electron_1.BrowserWindow({
+    cameraWindow = new BrowserWindow({
         width: 300,
         height: 300,
-        x: electron_1.screen.getPrimaryDisplay().workAreaSize.width - 320,
-        y: electron_1.screen.getPrimaryDisplay().workAreaSize.height - 320,
+        x: screen.getPrimaryDisplay().workAreaSize.width - 320,
+        y: screen.getPrimaryDisplay().workAreaSize.height - 320,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
         hasShadow: false,
         resizable: true,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
         },
     });
     if (VITE_DEV_SERVER_URL) {
         cameraWindow.loadURL(`${VITE_DEV_SERVER_URL}#/camera`);
     }
     else {
-        cameraWindow.loadFile(path_1.default.join(process.env.DIST, 'index.html'), { hash: 'camera' });
+        cameraWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'camera' });
     }
 }
 function createTeleprompterWindow() {
-    teleprompterWindow = new electron_1.BrowserWindow({
+    teleprompterWindow = new BrowserWindow({
         width: 600,
         height: 200,
         frame: false,
@@ -57,7 +57,7 @@ function createTeleprompterWindow() {
         alwaysOnTop: true,
         hasShadow: false,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
         },
     });
     // CRITICAL: Hide from screen capture
@@ -66,26 +66,25 @@ function createTeleprompterWindow() {
         teleprompterWindow.loadURL(`${VITE_DEV_SERVER_URL}#/teleprompter`);
     }
     else {
-        teleprompterWindow.loadFile(path_1.default.join(process.env.DIST, 'index.html'), { hash: 'teleprompter' });
+        teleprompterWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter' });
     }
 }
-electron_1.app.on('window-all-closed', () => {
+app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        electron_1.app.quit();
+        app.quit();
     }
 });
-electron_1.app.on('activate', () => {
-    if (electron_1.BrowserWindow.getAllWindows().length === 0) {
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
         createControlWindow();
     }
 });
-electron_1.app.whenReady().then(() => {
+app.whenReady().then(() => {
     createControlWindow();
     createCameraWindow();
     createTeleprompterWindow();
     // IPC Handlers
-    electron_1.ipcMain.handle('get-sources', async () => {
-        const { desktopCapturer } = require('electron');
+    ipcMain.handle('get-sources', async () => {
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
         return sources.map((source) => ({
             id: source.id,
@@ -93,7 +92,7 @@ electron_1.app.whenReady().then(() => {
             thumbnail: source.thumbnail.toDataURL(),
         }));
     });
-    electron_1.ipcMain.on('set-camera-shape', (_, shape) => {
+    ipcMain.on('set-camera-shape', (_, shape) => {
         if (cameraWindow) {
             cameraWindow.webContents.send('camera-shape-changed', shape);
             // Optional: Resize window if needed based on shape
@@ -109,12 +108,12 @@ electron_1.app.whenReady().then(() => {
             }
         }
     });
-    electron_1.ipcMain.on('set-teleprompter-text', (_, text) => {
+    ipcMain.on('set-teleprompter-text', (_, text) => {
         if (teleprompterWindow) {
             teleprompterWindow.webContents.send('teleprompter-text-changed', text);
         }
     });
-    electron_1.ipcMain.on('set-camera-size', (_, size) => {
+    ipcMain.on('set-camera-size', (_, size) => {
         if (cameraWindow) {
             let width = 300;
             let height = 300;
@@ -135,9 +134,7 @@ electron_1.app.whenReady().then(() => {
             cameraWindow.setSize(width, height);
         }
     });
-    electron_1.ipcMain.handle('save-recording', async (_, buffer) => {
-        const { dialog } = require('electron');
-        const fs = require('fs');
+    ipcMain.handle('save-recording', async (_, buffer) => {
         const { filePath } = await dialog.showSaveDialog({
             buttonLabel: 'Save video',
             defaultPath: `recording-${Date.now()}.webm`

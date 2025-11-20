@@ -1,8 +1,15 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 process.env.DIST = path.join(__dirname, '../dist');
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
+
+const DIST_PATH = process.env.DIST!;
 
 let controlWindow: BrowserWindow | null;
 let cameraWindow: BrowserWindow | null;
@@ -22,7 +29,7 @@ function createControlWindow() {
     if (VITE_DEV_SERVER_URL) {
         controlWindow.loadURL(VITE_DEV_SERVER_URL as string);
     } else {
-        controlWindow.loadFile(path.join(process.env.DIST, 'index.html'));
+        controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
     }
 }
 
@@ -45,7 +52,7 @@ function createCameraWindow() {
     if (VITE_DEV_SERVER_URL) {
         cameraWindow.loadURL(`${VITE_DEV_SERVER_URL}#/camera`);
     } else {
-        cameraWindow.loadFile(path.join(process.env.DIST, 'index.html'), { hash: 'camera' });
+        cameraWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'camera' });
     }
 }
 
@@ -68,7 +75,7 @@ function createTeleprompterWindow() {
     if (VITE_DEV_SERVER_URL) {
         teleprompterWindow.loadURL(`${VITE_DEV_SERVER_URL}#/teleprompter`);
     } else {
-        teleprompterWindow.loadFile(path.join(process.env.DIST, 'index.html'), { hash: 'teleprompter' });
+        teleprompterWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter' });
     }
 }
 
@@ -91,7 +98,6 @@ app.whenReady().then(() => {
 
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
-        const { desktopCapturer } = require('electron');
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
         return sources.map((source: any) => ({
             id: source.id,
@@ -135,8 +141,6 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('save-recording', async (_, buffer) => {
-        const { dialog } = require('electron');
-        const fs = require('fs');
         const { filePath } = await dialog.showSaveDialog({
             buttonLabel: 'Save video',
             defaultPath: `recording-${Date.now()}.webm`
