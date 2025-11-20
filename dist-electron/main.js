@@ -12,15 +12,20 @@ let cameraWindow;
 let teleprompterWindow;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 function createControlWindow() {
+    const preloadPath = path.join(__dirname, 'preload.js');
+    console.log('Preload path for control window:', preloadPath);
+    console.log('Preload file exists:', fs.existsSync(preloadPath));
     controlWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: preloadPath,
             contextIsolation: true,
             nodeIntegration: false,
         },
     });
+    // Open DevTools for debugging
+    controlWindow.webContents.openDevTools();
     if (VITE_DEV_SERVER_URL) {
         controlWindow.loadURL(VITE_DEV_SERVER_URL);
     }
@@ -53,6 +58,10 @@ function createCameraWindow() {
     }
 }
 function createTeleprompterWindow() {
+    // Clean up old window if exists
+    if (teleprompterWindow && !teleprompterWindow.isDestroyed()) {
+        teleprompterWindow.destroy();
+    }
     teleprompterWindow = new BrowserWindow({
         width: 600,
         height: 200,
@@ -68,6 +77,10 @@ function createTeleprompterWindow() {
     });
     // CRITICAL: Hide from screen capture
     teleprompterWindow.setContentProtection(true);
+    // Handle window close
+    teleprompterWindow.on('closed', () => {
+        teleprompterWindow = null;
+    });
     if (VITE_DEV_SERVER_URL) {
         teleprompterWindow.loadURL(`${VITE_DEV_SERVER_URL}#/teleprompter`);
     }
@@ -88,7 +101,7 @@ app.on('activate', () => {
 app.whenReady().then(() => {
     createControlWindow();
     createCameraWindow();
-    createTeleprompterWindow();
+    // Teleprompter will be created on demand via button click
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
@@ -165,6 +178,47 @@ app.whenReady().then(() => {
             return true;
         }
         return false;
+    });
+    ipcMain.on('close-teleprompter', () => {
+        console.log('Received close-teleprompter IPC message');
+        if (teleprompterWindow) {
+            console.log('Teleprompter window exists, closing it...');
+            teleprompterWindow.close();
+            teleprompterWindow = null;
+            console.log('Teleprompter window closed');
+        }
+        else {
+            console.log('Teleprompter window is null or already closed');
+        }
+    });
+    ipcMain.on('toggle-teleprompter', () => {
+        console.log('Toggling teleprompter window');
+        if (teleprompterWindow && !teleprompterWindow.isDestroyed()) {
+            if (teleprompterWindow.isVisible()) {
+                teleprompterWindow.hide();
+            }
+            else {
+                teleprompterWindow.show();
+            }
+        }
+        else {
+            // If window was destroyed, recreate it
+            console.log('Recreating teleprompter window');
+            createTeleprompterWindow();
+        }
+    });
+    ipcMain.on('open-teleprompter', () => {
+        console.log('Received open-teleprompter IPC message');
+        if (teleprompterWindow && !teleprompterWindow.isDestroyed()) {
+            // Window exists, just show it
+            teleprompterWindow.show();
+            teleprompterWindow.focus();
+        }
+        else {
+            // Window doesn't exist, create it
+            console.log('Creating teleprompter window');
+            createTeleprompterWindow();
+        }
     });
 });
 //# sourceMappingURL=main.js.map

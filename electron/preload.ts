@@ -23,4 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onTeleprompterTextChange: handleTeleprompterTextChange,
     saveRecording: (buffer: ArrayBuffer) => ipcRenderer.invoke('save-recording', buffer),
     setCameraSize: (size: string) => ipcRenderer.send('set-camera-size', size),
+    closeTeleprompter: () => ipcRenderer.send('close-teleprompter'),
+    toggleTeleprompter: () => ipcRenderer.send('toggle-teleprompter'),
+    openTeleprompter: () => ipcRenderer.send('open-teleprompter'),
 });

@@ -6,6 +6,9 @@ export interface IElectronAPI {
     onTeleprompterTextChange: (callback: (text: string) => void) => void;
     saveRecording: (buffer: ArrayBuffer) => Promise<boolean>;
     setCameraSize: (size: string) => void;
+    closeTeleprompter: () => void;
+    toggleTeleprompter: () => void;
+    openTeleprompter: () => void;
 }
 
 declare global {

@@ -9,13 +9,23 @@ const ControlPanel = () => {
     const chunksRef = useRef<Blob[]>([]);
 
     useEffect(() => {
+        console.log('ControlPanel mounted');
+        console.log('window.electronAPI available:', !!window.electronAPI);
+        
         const getSources = async () => {
             if (window.electronAPI) {
-                const sources = await window.electronAPI.getSources();
-                setSources(sources);
-                if (sources.length > 0) {
-                    setSelectedSourceId(sources[0].id);
+                try {
+                    const sources = await window.electronAPI.getSources();
+                    console.log('Sources received:', sources);
+                    setSources(sources);
+                    if (sources.length > 0) {
+                        setSelectedSourceId(sources[0].id);
+                    }
+                } catch (error) {
+                    console.error('Error getting sources:', error);
                 }
+            } else {
+                console.warn('electronAPI not available - running in browser mode?');
             }
         };
         getSources();
@@ -102,7 +112,7 @@ const ControlPanel = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-8 font-sans">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-8 font-sans" style={{ pointerEvents: 'auto' }}>
             <header className="flex items-center gap-3 mb-10">
                 <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">
                     <Video className="w-6 h-6 text-white" />
@@ -137,7 +147,16 @@ const ControlPanel = () => {
                         </div>
 
                         <button
-                            onClick={isRecording ? stopRecording : startRecording}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('Recording button clicked, isRecording:', isRecording);
+                                if (isRecording) {
+                                    stopRecording();
+                                } else {
+                                    startRecording();
+                                }
+                            }}
                             disabled={!selectedSourceId}
                             className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 ${isRecording
                                 ? 'bg-gradient-to-r from-red-500 to-pink-600 shadow-red-500/25'
@@ -179,7 +198,9 @@ const ControlPanel = () => {
                                 {['circle', 'square', 'rounded'].map((shape) => (
                                     <button
                                         key={shape}
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
                                             console.log('Setting camera shape to:', shape);
                                             if (window.electronAPI) {
                                                 window.electronAPI.setCameraShape(shape);
@@ -187,7 +208,7 @@ const ControlPanel = () => {
                                                 console.error('electronAPI not available');
                                             }
                                         }}
-                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize"
+                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize cursor-pointer"
                                     >
                                         {shape}
                                     </button>
@@ -204,7 +225,9 @@ const ControlPanel = () => {
                                 {['small', 'medium', 'large'].map((size) => (
                                     <button
                                         key={size}
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
                                             console.log('Setting camera size to:', size);
                                             if (window.electronAPI) {
                                                 window.electronAPI.setCameraSize(size);
@@ -212,7 +235,7 @@ const ControlPanel = () => {
                                                 console.error('electronAPI not available');
                                             }
                                         }}
-                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize"
+                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize cursor-pointer"
                                     >
                                         {size}
                                     </button>
@@ -222,15 +245,42 @@ const ControlPanel = () => {
 
                         {/* Teleprompter */}
                         <div className="space-y-3">
-                            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                                <Type className="w-4 h-4" /> Teleprompter Script
-                            </label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                                    <Type className="w-4 h-4" /> Teleprompter Script
+                                </label>
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('Open teleprompter button clicked');
+                                        if (window.electronAPI) {
+                                            window.electronAPI.openTeleprompter();
+                                        } else {
+                                            console.error('electronAPI not available');
+                                        }
+                                    }}
+                                    className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 rounded-lg transition-colors cursor-pointer"
+                                >
+                                    Abrir Teleprompter
+                                </button>
+                            </div>
                             <textarea
-                                className="w-full bg-gray-900/80 border border-gray-700 rounded-xl p-4 text-white h-40 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none resize-none"
-                                placeholder="Enter your script here..."
+                                className="w-full bg-gray-900/80 border border-gray-700 rounded-xl p-4 text-white h-40 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none resize-none font-mono text-sm"
+                                placeholder="Digite seu script aqui... O texto aparecerá no teleprompter em tempo real."
+                                defaultValue=""
+                                onInput={(e) => {
+                                    const text = (e.target as HTMLTextAreaElement).value;
+                                    console.log('Setting teleprompter text (length):', text.length);
+                                    if (window.electronAPI) {
+                                        window.electronAPI.setTeleprompterText(text);
+                                    } else {
+                                        console.error('electronAPI not available');
+                                    }
+                                }}
                                 onChange={(e) => {
                                     const text = e.target.value;
-                                    console.log('Setting teleprompter text:', text.substring(0, 50) + '...');
+                                    console.log('Setting teleprompter text (onChange):', text.length);
                                     if (window.electronAPI) {
                                         window.electronAPI.setTeleprompterText(text);
                                     } else {
