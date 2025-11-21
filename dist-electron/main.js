@@ -506,6 +506,10 @@ app.whenReady().then(() => {
     });
     ipcMain.on('open-teleprompter', () => {
         console.log('Received open-teleprompter IPC message');
+        if (teleprompterControlWindow && !teleprompterControlWindow.isDestroyed()) {
+            teleprompterControlWindow.close();
+            teleprompterControlWindow = null;
+        }
         if (teleprompterWindow && !teleprompterWindow.isDestroyed()) {
             // Window exists, just show it
             teleprompterWindow.show();
