@@ -210,8 +210,11 @@ function createTeleprompterWindow() {
     }
 
     teleprompterWindow = new BrowserWindow({
-        width: 600,
-        height: 200,
+        width: 900,
+        height: 500,
+        minWidth: 500,
+        minHeight: 300,
+        resizable: true,
         frame: false,
         transparent: true,
         alwaysOnTop: true,

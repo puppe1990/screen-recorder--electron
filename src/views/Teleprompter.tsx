@@ -81,42 +81,45 @@ const Teleprompter = () => {
   };
 
   return (
-    <div className="w-full h-full bg-black/50 text-white p-4 overflow-hidden relative drag-region">
-      {/* Close button */}
-      <button
-        onClick={handleClose}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        className="absolute top-2 right-2 z-[9999] p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800 no-drag"
-        style={{ 
-          pointerEvents: 'auto',
-          userSelect: 'none',
-          zIndex: 9999
-        }}
-        title="Fechar Teleprompter (ou pressione ESC)"
-      >
-        <X className="w-6 h-6" />
-      </button>
-      
-      <div
-        key={scrollCycle}
-        className="text-2xl font-bold leading-relaxed text-center whitespace-pre-wrap drag-region"
-        style={{
-          animation: `scroll ${effectiveDuration}s linear infinite`,
-          animationPlayState: isRunning ? 'running' : 'paused',
-        }}
-      >
-        {text}
+    <div className="w-full h-full bg-black/60 text-white p-5 overflow-hidden relative flex flex-col gap-4 drag-region">
+      <div className="flex justify-end no-drag">
+        <button
+          onClick={handleClose}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800"
+          style={{ 
+            pointerEvents: 'auto',
+            userSelect: 'none',
+            zIndex: 9999
+          }}
+          title="Fechar Teleprompter (ou pressione ESC)"
+        >
+          <X className="w-6 h-6" />
+        </button>
       </div>
 
-      {/* Controls overlay */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap items-center gap-2 bg-black/50 border border-white/10 rounded-2xl px-4 py-2 shadow-xl backdrop-blur-md no-drag"
+      <div className="flex-1 overflow-hidden relative rounded-2xl border border-white/10 bg-black/40 px-8 py-6">
+        <div
+          key={scrollCycle}
+          className="text-3xl font-bold leading-relaxed text-center whitespace-pre-wrap no-drag"
+          style={{
+            animation: `scroll ${effectiveDuration}s linear infinite`,
+            animationPlayState: isRunning ? 'running' : 'paused',
+          }}
+        >
+          {text}
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="no-drag flex flex-wrap items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 shadow-lg backdrop-blur-md"
         style={{ pointerEvents: 'auto' }}>
         <button
           onClick={handlePlay}
@@ -142,7 +145,7 @@ const Teleprompter = () => {
           <Square className="w-4 h-4" />
           Stop
         </button>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white">
           <Gauge className="w-4 h-4" />
           <span className="text-xs text-slate-200">Velocidade</span>
           <input
@@ -152,10 +155,10 @@ const Teleprompter = () => {
             step="0.1"
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className="w-28 accent-purple-400"
+            className="w-32 accent-purple-400"
             title="Velocidade do texto"
           />
-          <span className="font-semibold">{speed.toFixed(1)}x</span>
+          <span className="font-semibold w-10 text-right">{speed.toFixed(1)}x</span>
         </div>
       </div>
       <style>{`
