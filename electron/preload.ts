@@ -26,4 +26,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     closeTeleprompter: () => ipcRenderer.send('close-teleprompter'),
     toggleTeleprompter: () => ipcRenderer.send('toggle-teleprompter'),
     openTeleprompter: () => ipcRenderer.send('open-teleprompter'),
+    hideControlWindow: () => ipcRenderer.send('hide-control-window'),
+    showControlWindow: () => ipcRenderer.send('show-control-window'),
 });

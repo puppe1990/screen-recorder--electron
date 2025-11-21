@@ -5,6 +5,8 @@ const ControlPanel = () => {
     const [sources, setSources] = useState<{ id: string; name: string; thumbnail: string }[]>([]);
     const [selectedSourceId, setSelectedSourceId] = useState<string>('');
     const [isRecording, setIsRecording] = useState(false);
+    const [cameraShape, setCameraShape] = useState<string>('circle');
+    const cameraShapeRef = useRef<string>('circle');
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
@@ -31,6 +33,19 @@ const ControlPanel = () => {
         getSources();
     }, []);
 
+    // Listen for camera shape changes
+    useEffect(() => {
+        if (window.electronAPI) {
+            const handleShapeChange = (newShape: string) => {
+                console.log('Camera shape changed to:', newShape);
+                setCameraShape(newShape);
+                cameraShapeRef.current = newShape; // Update ref for recording
+            };
+            
+            window.electronAPI.onCameraShapeChange(handleShapeChange);
+        }
+    }, []);
+
     const startRecording = async () => {
         try {
             if (!selectedSourceId) {
@@ -39,6 +54,7 @@ const ControlPanel = () => {
             }
 
             // Get screen capture stream
+            // The camera window is already visible on screen and will be captured automatically
             const screenStream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
@@ -54,91 +70,13 @@ const ControlPanel = () => {
                 } as any,
             });
 
-            // Get camera stream
-            let cameraStream: MediaStream | null = null;
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        width: 300, 
-                        height: 300,
-                        facingMode: 'user'
-                    },
-                    audio: false,
-                });
-            } catch (cameraError) {
-                console.warn('Could not access camera, recording without camera overlay:', cameraError);
+            // Hide control window before recording
+            if (window.electronAPI) {
+                window.electronAPI.hideControlWindow();
             }
 
-            // Combine streams using Canvas API
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-                throw new Error('Could not get canvas context');
-            }
-
-            // Set canvas size to match screen stream
-            const screenVideo = document.createElement('video');
-            screenVideo.srcObject = screenStream;
-            screenVideo.autoplay = true;
-            screenVideo.muted = true;
-            await new Promise((resolve) => {
-                screenVideo.onloadedmetadata = () => {
-                    canvas.width = screenVideo.videoWidth;
-                    canvas.height = screenVideo.videoHeight;
-                    resolve(null);
-                };
-            });
-
-            let cameraVideo: HTMLVideoElement | null = null;
-            if (cameraStream) {
-                cameraVideo = document.createElement('video');
-                cameraVideo.srcObject = cameraStream;
-                cameraVideo.autoplay = true;
-                cameraVideo.muted = true;
-                await new Promise((resolve) => {
-                    cameraVideo!.onloadedmetadata = () => resolve(null);
-                });
-            }
-
-            // Draw function to combine streams
-            const draw = () => {
-                if (!ctx) return;
-                
-                // Draw screen
-                ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
-                
-                // Draw camera overlay in bottom right corner
-                if (cameraVideo) {
-                    const cameraSize = 300;
-                    const x = canvas.width - cameraSize - 20;
-                    const y = canvas.height - cameraSize - 20;
-                    
-                    // Draw circular mask for camera
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(x + cameraSize / 2, y + cameraSize / 2, cameraSize / 2, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.drawImage(cameraVideo, x, y, cameraSize, cameraSize);
-                    ctx.restore();
-                    
-                    // Draw border
-                    ctx.strokeStyle = '#3b82f6';
-                    ctx.lineWidth = 4;
-                    ctx.beginPath();
-                    ctx.arc(x + cameraSize / 2, y + cameraSize / 2, cameraSize / 2, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                requestAnimationFrame(draw);
-            };
-            
-            draw();
-
-            // Get stream from canvas
-            const combinedStream = canvas.captureStream(30); // 30 FPS
-
-            const mediaRecorder = new MediaRecorder(combinedStream, {
+            // Record directly from screen stream (camera window is already visible on screen)
+            const mediaRecorder = new MediaRecorder(screenStream, {
                 mimeType: 'video/webm;codecs=vp9',
                 videoBitsPerSecond: 2500000
             });
@@ -157,12 +95,10 @@ const ControlPanel = () => {
 
                 // Stop all tracks to release resources
                 screenStream.getTracks().forEach(track => track.stop());
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                }
-                screenVideo.srcObject = null;
-                if (cameraVideo) {
-                    cameraVideo.srcObject = null;
+
+                // Show control window after recording stops
+                if (window.electronAPI) {
+                    window.electronAPI.showControlWindow();
                 }
 
                 if (window.electronAPI) {
@@ -184,6 +120,10 @@ const ControlPanel = () => {
             mediaRecorder.onerror = (e) => {
                 console.error('MediaRecorder error:', e);
                 setIsRecording(false);
+                // Show control window on error
+                if (window.electronAPI) {
+                    window.electronAPI.showControlWindow();
+                }
             };
 
             mediaRecorder.start(1000); // Collect data every second
@@ -192,6 +132,10 @@ const ControlPanel = () => {
             console.error('Failed to start recording:', e);
             alert(`Erro ao iniciar gravação: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
             setIsRecording(false);
+            // Show control window on error
+            if (window.electronAPI) {
+                window.electronAPI.showControlWindow();
+            }
         }
     };
 
@@ -199,147 +143,133 @@ const ControlPanel = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
+            // Show control window after stopping
+            if (window.electronAPI) {
+                window.electronAPI.showControlWindow();
+            }
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-8 font-sans" style={{ pointerEvents: 'auto' }}>
-            <header className="flex items-center gap-3 mb-10">
-                <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">
-                    <Video className="w-6 h-6 text-white" />
-                </div>
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                    Studio Recorder
-                </h1>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Recording Section */}
-                <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 p-8 rounded-3xl shadow-xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Monitor className="w-5 h-5 text-blue-400" />
-                        <h2 className="text-xl font-semibold">Recording Source</h2>
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" style={{ pointerEvents: 'auto' }}>
+            <div className="max-w-7xl mx-auto px-6 py-8">
+                {/* Header */}
+                <header className="mb-12">
+                    <div className="flex items-center gap-4 mb-2">
+                        <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
+                            <Video className="w-7 h-7 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-300">
+                                Studio Recorder
+                            </h1>
+                            <p className="text-slate-400 text-sm mt-1">Grave sua tela com qualidade profissional</p>
+                        </div>
                     </div>
+                </header>
 
-                    <div className="space-y-6">
-                        <div className="relative group">
-                            <select
-                                className="w-full bg-gray-900/80 border border-gray-700 rounded-xl p-4 text-white appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none hover:bg-gray-900"
-                                value={selectedSourceId}
-                                onChange={(e) => setSelectedSourceId(e.target.value)}
-                            >
-                                {sources.map((source) => (
-                                    <option key={source.id} value={source.id}>{source.name}</option>
-                                ))}
-                            </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                                <MousePointer2 className="w-4 h-4" />
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    {/* Main Recording Section - Takes 2 columns */}
+                    <div className="xl:col-span-2 space-y-6">
+                        {/* Recording Card */}
+                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="p-2.5 bg-blue-500/20 rounded-xl">
+                                    <Monitor className="w-6 h-6 text-blue-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white">Gravação</h2>
+                                    <p className="text-slate-400 text-sm">Selecione a fonte e inicie a gravação</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Source Selection */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                                        Fonte de Gravação
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 pr-12 text-white text-base appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none hover:border-slate-600 cursor-pointer"
+                                            value={selectedSourceId}
+                                            onChange={(e) => setSelectedSourceId(e.target.value)}
+                                        >
+                                            {sources.length === 0 ? (
+                                                <option value="">Carregando fontes...</option>
+                                            ) : (
+                                                sources.map((source) => (
+                                                    <option key={source.id} value={source.id} className="bg-slate-800">
+                                                        {source.name}
+                                                    </option>
+                                                ))
+                                            )}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <MousePointer2 className="w-5 h-5" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Recording Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('Recording button clicked, isRecording:', isRecording);
+                                        if (isRecording) {
+                                            stopRecording();
+                                        } else {
+                                            startRecording();
+                                        }
+                                    }}
+                                    disabled={!selectedSourceId || sources.length === 0}
+                                    className={`w-full py-5 rounded-xl font-bold text-lg shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 ${
+                                        isRecording
+                                            ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-red-500/40 text-white'
+                                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-500/40 text-white'
+                                    } disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100`}
+                                >
+                                    {isRecording ? (
+                                        <>
+                                            <span className="relative flex h-4 w-4">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
+                                            </span>
+                                            <span>Parar Gravação</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Video className="w-6 h-6" />
+                                            <span>Iniciar Gravação</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                {isRecording && (
+                                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span>
+                                        </span>
+                                        <span>Gravando em andamento...</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('Recording button clicked, isRecording:', isRecording);
-                                if (isRecording) {
-                                    stopRecording();
-                                } else {
-                                    startRecording();
-                                }
-                            }}
-                            disabled={!selectedSourceId}
-                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 ${isRecording
-                                ? 'bg-gradient-to-r from-red-500 to-pink-600 shadow-red-500/25'
-                                : 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-500/25'
-                                } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
-                        >
-                            {isRecording ? (
-                                <>
-                                    <span className="relative flex h-3 w-3">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-                                    </span>
-                                    Stop Recording
-                                </>
-                            ) : (
-                                <>
-                                    <Video className="w-5 h-5" />
-                                    Start Recording
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Settings Section */}
-                <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 p-8 rounded-3xl shadow-xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Settings className="w-5 h-5 text-purple-400" />
-                        <h2 className="text-xl font-semibold">Studio Settings</h2>
-                    </div>
-
-                    <div className="space-y-8">
-                        {/* Camera Shape */}
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                                <Circle className="w-4 h-4" /> Camera Shape
-                            </label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {['circle', 'square', 'rounded'].map((shape) => (
-                                    <button
-                                        key={shape}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            console.log('Setting camera shape to:', shape);
-                                            if (window.electronAPI) {
-                                                window.electronAPI.setCameraShape(shape);
-                                            } else {
-                                                console.error('electronAPI not available');
-                                            }
-                                        }}
-                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize cursor-pointer"
-                                    >
-                                        {shape}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Camera Size */}
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                                <Settings className="w-4 h-4" /> Camera Size
-                            </label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {['small', 'medium', 'large'].map((size) => (
-                                    <button
-                                        key={size}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            console.log('Setting camera size to:', size);
-                                            if (window.electronAPI) {
-                                                window.electronAPI.setCameraSize(size);
-                                            } else {
-                                                console.error('electronAPI not available');
-                                            }
-                                        }}
-                                        className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all text-sm capitalize cursor-pointer"
-                                    >
-                                        {size}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Teleprompter */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                                    <Type className="w-4 h-4" /> Teleprompter Script
-                                </label>
+                        {/* Teleprompter Section */}
+                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-purple-500/20 rounded-xl">
+                                        <Type className="w-6 h-6 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white">Teleprompter</h2>
+                                        <p className="text-slate-400 text-xs">Escreva seu script aqui</p>
+                                    </div>
+                                </div>
                                 <button
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -351,13 +281,13 @@ const ControlPanel = () => {
                                             console.error('electronAPI not available');
                                         }
                                     }}
-                                    className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 rounded-lg transition-colors cursor-pointer"
+                                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/30 cursor-pointer"
                                 >
-                                    Abrir Teleprompter
+                                    Abrir Janela
                                 </button>
                             </div>
                             <textarea
-                                className="w-full bg-gray-900/80 border border-gray-700 rounded-xl p-4 text-white h-40 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none resize-none font-mono text-sm"
+                                className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 text-white h-48 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all outline-none resize-none font-sans text-sm leading-relaxed placeholder:text-slate-500"
                                 placeholder="Digite seu script aqui... O texto aparecerá no teleprompter em tempo real."
                                 defaultValue=""
                                 onInput={(e) => {
@@ -379,6 +309,80 @@ const ControlPanel = () => {
                                     }
                                 }}
                             />
+                        </div>
+                    </div>
+
+                    {/* Settings Sidebar */}
+                    <div className="xl:col-span-1">
+                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-6 sticky top-6">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2.5 bg-purple-500/20 rounded-xl">
+                                    <Settings className="w-5 h-5 text-purple-400" />
+                                </div>
+                                <h2 className="text-xl font-bold text-white">Configurações</h2>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Camera Shape */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                        <Circle className="w-4 h-4" />
+                                        Formato da Câmera
+                                    </label>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {['circle', 'square', 'rounded'].map((shape) => (
+                                            <button
+                                                key={shape}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Setting camera shape to:', shape);
+                                                    if (window.electronAPI) {
+                                                        window.electronAPI.setCameraShape(shape);
+                                                    } else {
+                                                        console.error('electronAPI not available');
+                                                    }
+                                                }}
+                                                className={`p-3.5 bg-slate-900/80 border-2 rounded-xl transition-all text-sm font-medium capitalize cursor-pointer text-left ${
+                                                    cameraShape === shape
+                                                        ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+                                                        : 'border-slate-700 hover:border-slate-600 hover:bg-slate-800 text-slate-300'
+                                                }`}
+                                            >
+                                                {shape === 'circle' ? 'Círculo' : shape === 'square' ? 'Quadrado' : 'Arredondado'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Camera Size */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                        <Settings className="w-4 h-4" />
+                                        Tamanho da Câmera
+                                    </label>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {['small', 'medium', 'large'].map((size) => (
+                                            <button
+                                                key={size}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Setting camera size to:', size);
+                                                    if (window.electronAPI) {
+                                                        window.electronAPI.setCameraSize(size);
+                                                    } else {
+                                                        console.error('electronAPI not available');
+                                                    }
+                                                }}
+                                                className="p-3.5 bg-slate-900/80 border-2 border-slate-700 rounded-xl hover:border-slate-600 hover:bg-slate-800 transition-all text-sm font-medium capitalize cursor-pointer text-left text-slate-300"
+                                            >
+                                                {size === 'small' ? 'Pequeno' : size === 'medium' ? 'Médio' : 'Grande'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

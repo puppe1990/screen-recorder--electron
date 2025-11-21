@@ -9,6 +9,8 @@ export interface IElectronAPI {
     closeTeleprompter: () => void;
     toggleTeleprompter: () => void;
     openTeleprompter: () => void;
+    hideControlWindow: () => void;
+    showControlWindow: () => void;
 }
 
 declare global {

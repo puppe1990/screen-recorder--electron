@@ -34,7 +34,7 @@ function App() {
   }, []);
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
+    <div className="h-screen w-screen overflow-auto">
       {currentView === 'control' && <ControlPanel />}
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}

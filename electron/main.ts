@@ -40,6 +40,13 @@ function createControlWindow() {
     } else {
         controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
     }
+
+    // Hide control window from screen capture - must be called after load
+    controlWindow.webContents.once('did-finish-load', () => {
+        if (controlWindow) {
+            controlWindow.setContentProtection(true);
+        }
+    });
 }
 
 function createCameraWindow() {
@@ -126,11 +133,25 @@ app.whenReady().then(() => {
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
-        return sources.map((source: any) => ({
-            id: source.id,
-            name: source.name,
-            thumbnail: source.thumbnail.toDataURL(),
-        }));
+        
+        // Filter out control window and teleprompter window from sources by name
+        const filteredSources = sources
+            .filter((source: any) => {
+                // Exclude control window and teleprompter window by name
+                const name = source.name.toLowerCase();
+                const isControlWindow = name.includes('screen-recorder-electron') && 
+                                      !name.includes('camera') &&
+                                      !name.includes('teleprompter');
+                const isTeleprompterWindow = name.includes('teleprompter');
+                return !isControlWindow && !isTeleprompterWindow;
+            })
+            .map((source: any) => ({
+                id: source.id,
+                name: source.name,
+                thumbnail: source.thumbnail.toDataURL(),
+            }));
+        
+        return filteredSources;
     });
 
     ipcMain.on('set-camera-shape', (_, shape) => {
@@ -229,6 +250,21 @@ app.whenReady().then(() => {
             // Window doesn't exist, create it
             console.log('Creating teleprompter window');
             createTeleprompterWindow();
+        }
+    });
+
+    ipcMain.on('hide-control-window', () => {
+        console.log('Hiding control window');
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.hide();
+        }
+    });
+
+    ipcMain.on('show-control-window', () => {
+        console.log('Showing control window');
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.show();
+            controlWindow.focus();
         }
     });
 });
