@@ -11,6 +11,7 @@ interface PreviewPlayerProps {
 
 const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const isResolvingDurationRef = useRef(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState<VideoFormat>('webm-vp9');
     const [videoUrl, setVideoUrl] = useState<string>('');
@@ -30,6 +31,7 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
         setPlaybackRate(1);
         setIsMuted(false);
         setVolume(0.8);
+        isResolvingDurationRef.current = false;
         if (videoRef.current) {
             videoRef.current.currentTime = 0;
             videoRef.current.pause();
@@ -61,6 +63,36 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
         return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
+    const resolveVideoDuration = () => {
+        if (!videoRef.current) return;
+
+        const video = videoRef.current;
+        const validDuration = (value: number) => Number.isFinite(value) && value > 0 && value !== Infinity;
+
+        if (validDuration(video.duration)) {
+            setDuration(video.duration);
+            return;
+        }
+
+        isResolvingDurationRef.current = true;
+
+        const handleDurationFix = () => {
+            if (!videoRef.current) return;
+
+            const fixedDuration = videoRef.current.duration;
+            if (!validDuration(fixedDuration)) return;
+
+            videoRef.current.removeEventListener('timeupdate', handleDurationFix);
+            videoRef.current.currentTime = 0;
+            setCurrentTime(0);
+            setDuration(fixedDuration);
+            isResolvingDurationRef.current = false;
+        };
+
+        video.addEventListener('timeupdate', handleDurationFix);
+        video.currentTime = 1000000000;
+    };
+
     const handlePlayPause = () => {
         if (videoRef.current) {
             if (isPlaying) {
@@ -83,7 +115,7 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
     };
 
     const handleTimeUpdate = () => {
-        if (videoRef.current) {
+        if (videoRef.current && !isResolvingDurationRef.current) {
             setCurrentTime(videoRef.current.currentTime);
         }
     };
@@ -97,8 +129,8 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
 
     const handleLoadedMetadata = () => {
         if (!videoRef.current) return;
-        setDuration(videoRef.current.duration);
         setResolution(`${videoRef.current.videoWidth} x ${videoRef.current.videoHeight}`);
+        resolveVideoDuration();
     };
 
     const handleSkip = (amount: number) => {
