@@ -20,10 +20,14 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     onCameraShapeChange: handleCameraShapeChange,
     setTeleprompterText: (text) => electron_1.ipcRenderer.send('set-teleprompter-text', text),
     onTeleprompterTextChange: handleTeleprompterTextChange,
-    saveRecording: (buffer) => electron_1.ipcRenderer.invoke('save-recording', buffer),
+    saveRecording: (buffer, extension) => electron_1.ipcRenderer.invoke('save-recording', buffer, extension),
     setCameraSize: (size) => electron_1.ipcRenderer.send('set-camera-size', size),
     closeTeleprompter: () => electron_1.ipcRenderer.send('close-teleprompter'),
     toggleTeleprompter: () => electron_1.ipcRenderer.send('toggle-teleprompter'),
     openTeleprompter: () => electron_1.ipcRenderer.send('open-teleprompter'),
+    hideControlWindow: () => electron_1.ipcRenderer.send('hide-control-window'),
+    showControlWindow: () => electron_1.ipcRenderer.send('show-control-window'),
+    hideCameraWindow: () => electron_1.ipcRenderer.send('hide-camera-window'),
+    showCameraWindow: () => electron_1.ipcRenderer.send('show-camera-window'),
 });
 //# sourceMappingURL=preload.js.map

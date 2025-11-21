@@ -15,9 +15,11 @@ function createControlWindow() {
     const preloadPath = path.join(__dirname, 'preload.js');
     console.log('Preload path for control window:', preloadPath);
     console.log('Preload file exists:', fs.existsSync(preloadPath));
+    const iconPath = path.join(process.env.VITE_PUBLIC || DIST_PATH, 'icon.png');
     controlWindow = new BrowserWindow({
         width: 800,
         height: 600,
+        icon: fs.existsSync(iconPath) ? iconPath : undefined,
         webPreferences: {
             preload: preloadPath,
             contextIsolation: true,
@@ -32,6 +34,12 @@ function createControlWindow() {
     else {
         controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
     }
+    // Hide control window from screen capture - must be called after load
+    controlWindow.webContents.once('did-finish-load', () => {
+        if (controlWindow) {
+            controlWindow.setContentProtection(true);
+        }
+    });
 }
 function createCameraWindow() {
     cameraWindow = new BrowserWindow({
@@ -108,11 +116,23 @@ app.whenReady().then(() => {
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
-        return sources.map((source) => ({
+        // Filter out control window and teleprompter window from sources by name
+        const filteredSources = sources
+            .filter((source) => {
+            // Exclude control window and teleprompter window by name
+            const name = source.name.toLowerCase();
+            const isControlWindow = name.includes('screen-recorder-electron') &&
+                !name.includes('camera') &&
+                !name.includes('teleprompter');
+            const isTeleprompterWindow = name.includes('teleprompter');
+            return !isControlWindow && !isTeleprompterWindow;
+        })
+            .map((source) => ({
             id: source.id,
             name: source.name,
             thumbnail: source.thumbnail.toDataURL(),
         }));
+        return filteredSources;
     });
     ipcMain.on('set-camera-shape', (_, shape) => {
         console.log('Received set-camera-shape:', shape);
@@ -171,10 +191,21 @@ app.whenReady().then(() => {
             console.error('Camera window is null');
         }
     });
-    ipcMain.handle('save-recording', async (_, buffer) => {
+    ipcMain.handle('save-recording', async (_, buffer, extension = 'webm') => {
+        // Define file filters based on extension
+        const filters = [];
+        if (extension === 'mp4') {
+            filters.push({ name: 'MP4 Video', extensions: ['mp4'] });
+        }
+        else {
+            filters.push({ name: 'WebM Video', extensions: ['webm'] });
+        }
+        // Add all video formats as options
+        filters.push({ name: 'All Video Formats', extensions: ['webm', 'mp4', 'mov', 'avi'] });
         const { filePath } = await dialog.showSaveDialog({
-            buttonLabel: 'Save video',
-            defaultPath: `recording-${Date.now()}.webm`
+            buttonLabel: 'Salvar vídeo',
+            defaultPath: `recording-${Date.now()}.${extension}`,
+            filters: filters
         });
         if (filePath) {
             fs.writeFile(filePath, Buffer.from(buffer), () => console.log('Video saved successfully!'));
@@ -221,6 +252,31 @@ app.whenReady().then(() => {
             // Window doesn't exist, create it
             console.log('Creating teleprompter window');
             createTeleprompterWindow();
+        }
+    });
+    ipcMain.on('hide-control-window', () => {
+        console.log('Hiding control window');
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.hide();
+        }
+    });
+    ipcMain.on('show-control-window', () => {
+        console.log('Showing control window');
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.show();
+            controlWindow.focus();
+        }
+    });
+    ipcMain.on('hide-camera-window', () => {
+        console.log('Hiding camera window');
+        if (cameraWindow && !cameraWindow.isDestroyed()) {
+            cameraWindow.hide();
+        }
+    });
+    ipcMain.on('show-camera-window', () => {
+        console.log('Showing camera window');
+        if (cameraWindow && !cameraWindow.isDestroyed()) {
+            cameraWindow.show();
         }
     });
 });
