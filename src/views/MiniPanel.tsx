@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Circle, Video, Eye, EyeOff, GripVertical, Monitor, Maximize2 } from 'lucide-react';
+import { Circle, Video, Eye, EyeOff, GripVertical, Monitor, Maximize2, Type } from 'lucide-react';
 
 const MiniPanel = () => {
     const [cameraShape, setCameraShape] = useState<string>('circle');
@@ -37,6 +37,12 @@ const MiniPanel = () => {
     const handleOpenMainPanel = () => {
         if (window.electronAPI) {
             window.electronAPI.showMainPanel();
+        }
+    };
+
+    const handleOpenTeleprompter = () => {
+        if (window.electronAPI) {
+            window.electronAPI.openTeleprompter();
         }
     };
 
@@ -109,8 +115,8 @@ const MiniPanel = () => {
             className="h-screen w-screen flex items-center justify-center overflow-hidden"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-2 border-slate-700 rounded-xl shadow-2xl flex flex-col gap-3 px-4 py-3 w-[720px] max-w-[90vw]">
-                <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-2 border-slate-700 rounded-xl shadow-2xl flex flex-col gap-2 px-3 py-2 w-[760px] max-w-[95vw]">
+                <div className="flex flex-wrap items-center gap-2">
                     {/* Drag Handle */}
                     <div className="flex items-center text-slate-500 cursor-move">
                         <GripVertical className="w-4 h-4" />
@@ -128,6 +134,21 @@ const MiniPanel = () => {
                         >
                             <Monitor className="w-4 h-4 text-white" />
                             <Maximize2 className="w-3 h-3 text-white" />
+                        </button>
+                    </div>
+
+                    {/* Teleprompter Button */}
+                    <div 
+                        className="flex items-center border-r border-slate-600 pr-4"
+                        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                    >
+                        <button
+                            onClick={handleOpenTeleprompter}
+                            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors flex items-center gap-2"
+                            title="Abrir Teleprompter"
+                        >
+                            <Type className="w-4 h-4 text-white" />
+                            <span className="text-sm font-semibold text-white">Teleprompter</span>
                         </button>
                     </div>
 
@@ -224,12 +245,21 @@ const MiniPanel = () => {
                 </div>
 
                 <div 
-                    className="border-t border-slate-700/60 pt-2"
+                    className="border-t border-slate-700/60 pt-2 flex flex-wrap items-center justify-between gap-2"
                     style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 >
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="uppercase tracking-wide font-semibold text-slate-300">Status:</span>
+                        <span className="font-mono text-sm text-white">
+                            {isRecording ? formatTime(seconds) : '00:00'}
+                        </span>
+                        <span className={`${isRecording ? 'text-red-400' : 'text-green-400'}`}>
+                            {isRecording ? 'Gravando' : 'Pronto'}
+                        </span>
+                    </div>
                     <button
                         onClick={handleToggleRecording}
-                        className={`w-full py-3 rounded-lg font-semibold text-sm md:text-base shadow-lg transition-all flex items-center justify-center gap-2 ${
+                        className={`px-4 py-3 rounded-lg font-semibold text-sm md:text-base shadow-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
                             isRecording
                                 ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-red-500/30'
                                 : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-500/30'
