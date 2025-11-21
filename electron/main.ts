@@ -258,7 +258,17 @@ app.whenReady().then(() => {
         }
     });
 
-    ipcMain.handle('save-recording', async (_, buffer, extension = 'webm') => {
+    ipcMain.handle('save-recording', async (_, buffer, extension = 'webm', format?: string) => {
+        console.log(`save-recording called with extension: ${extension}, format: ${format}`);
+        
+        // Ensure extension matches the chosen format
+        // If format is mp4, force extension to mp4
+        if (format === 'mp4') {
+            extension = 'mp4';
+        } else if (format && format.startsWith('webm')) {
+            extension = 'webm';
+        }
+        
         // Define file filters based on extension
         const filters: { name: string; extensions: string[] }[] = [];
         
@@ -273,13 +283,27 @@ app.whenReady().then(() => {
             { name: 'All Video Formats', extensions: ['webm', 'mp4', 'mov', 'avi'] }
         );
 
-        const { filePath } = await dialog.showSaveDialog({
+        const { filePath, canceled } = await dialog.showSaveDialog({
             buttonLabel: 'Salvar vídeo',
             defaultPath: `recording-${Date.now()}.${extension}`,
             filters: filters
         });
 
-        if (filePath) {
+        if (filePath && !canceled) {
+            // Ensure the file path has the correct extension based on chosen format
+            let finalFilePath = filePath;
+            const pathExt = path.extname(filePath).toLowerCase();
+            
+            if (extension === 'mp4' && pathExt !== '.mp4') {
+                // User might have changed extension, but we need MP4
+                finalFilePath = filePath.replace(/\.[^.]+$/, '.mp4');
+            } else if (extension === 'webm' && pathExt !== '.webm') {
+                // User might have changed extension, but we need WebM
+                finalFilePath = filePath.replace(/\.[^.]+$/, '.webm');
+            }
+            
+            console.log(`Saving to: ${finalFilePath} with extension: ${extension}`);
+            
             try {
                 // If extension is mp4, we need to convert from WebM
                 // (MediaRecorder always records in WebM format)
@@ -290,7 +314,7 @@ app.whenReady().then(() => {
                     
                     console.log('Converting WebM to MP4...');
                     console.log('Temp file:', tempWebmPath);
-                    console.log('Output file:', filePath);
+                    console.log('Output file:', finalFilePath);
                     
                     // Convert WebM to MP4 using ffmpeg
                     await new Promise<void>((resolve, reject) => {
@@ -303,7 +327,7 @@ app.whenReady().then(() => {
                                 '-b:a 128k',
                                 '-movflags +faststart' // For web playback
                             ])
-                            .output(filePath)
+                            .output(finalFilePath)
                             .on('end', () => {
                                 console.log('Conversion completed successfully');
                                 // Delete temporary file
@@ -329,8 +353,8 @@ app.whenReady().then(() => {
                     console.log('Video converted and saved successfully!');
                 } else {
                     // Save WebM directly
-                    await writeFile(filePath, Buffer.from(buffer));
-                    console.log('Video saved successfully!');
+                    await writeFile(finalFilePath, Buffer.from(buffer));
+                    console.log(`Video saved as ${extension} successfully!`);
                 }
                 return true;
             } catch (error) {

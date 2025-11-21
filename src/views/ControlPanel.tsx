@@ -117,29 +117,30 @@ const ControlPanel = () => {
             };
 
             mediaRecorder.onstop = async () => {
-                // Determine blob type and extension based on format
-                let finalBlobType = 'video/webm';
+                // Determine extension based on format chosen in the panel
+                // MediaRecorder always records in WebM format, so we store the raw WebM data
                 let finalExtension = 'webm';
                 
+                // Determine final format based on what user selected in the panel
                 switch (videoFormat) {
                     case 'webm-vp9':
                     case 'webm-vp8':
-                        finalBlobType = 'video/webm';
                         finalExtension = 'webm';
                         break;
                     case 'mp4':
-                        finalBlobType = 'video/mp4';
                         finalExtension = 'mp4';
                         break;
                     default:
-                        finalBlobType = 'video/webm';
                         finalExtension = 'webm';
                 }
 
-                const blob = new Blob(chunksRef.current, { type: finalBlobType });
+                // Create blob from recorded chunks (always WebM format from MediaRecorder)
+                const blob = new Blob(chunksRef.current, { type: 'video/webm' });
 
                 // Stop all tracks to release resources
                 screenStream.getTracks().forEach(track => track.stop());
+
+                console.log(`Saving recording with format: ${videoFormat}, extension: ${finalExtension}`);
 
                 // Control window remains visible (already visible, doesn't need to be shown)
 
@@ -150,9 +151,13 @@ const ControlPanel = () => {
                         // You can add a loading state here if needed
                     }
                     const buffer = await blob.arrayBuffer();
-                    const success = await window.electronAPI.saveRecording(buffer, finalExtension);
+                    // Pass the chosen format and extension to main process
+                    // Main process will ensure the file is saved with the correct format
+                    const success = await window.electronAPI.saveRecording(buffer, finalExtension, videoFormat);
                     if (success && videoFormat === 'mp4') {
                         console.log('Conversion completed successfully!');
+                    } else if (success) {
+                        console.log(`Video saved as ${finalExtension} successfully!`);
                     }
                 } else {
                     // Fallback for browser testing
