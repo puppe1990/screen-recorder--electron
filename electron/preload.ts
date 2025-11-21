@@ -21,6 +21,18 @@ const handleStopRecordingTrigger = (callback: () => void) => {
     return () => ipcRenderer.removeListener('stop-recording-trigger', handler);
 };
 
+const handleStartRecordingTrigger = (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('start-recording-trigger', handler);
+    return () => ipcRenderer.removeListener('start-recording-trigger', handler);
+};
+
+const handleRecordingStateChange = (callback: (isRecording: boolean) => void) => {
+    const handler = (_: any, isRecording: boolean) => callback(isRecording);
+    ipcRenderer.on('recording-state-changed', handler);
+    return () => ipcRenderer.removeListener('recording-state-changed', handler);
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
     getSources: () => ipcRenderer.invoke('get-sources'),
     setCameraShape: (shape: string) => ipcRenderer.send('set-camera-shape', shape),
@@ -40,6 +52,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hideTimer: () => ipcRenderer.send('hide-timer'),
     stopRecording: () => ipcRenderer.send('stop-recording'),
     onStopRecordingTrigger: handleStopRecordingTrigger,
+    startRecording: () => ipcRenderer.send('start-recording'),
+    onStartRecordingTrigger: handleStartRecordingTrigger,
+    broadcastRecordingState: (isRecording: boolean) => ipcRenderer.send('broadcast-recording-state', isRecording),
+    onRecordingStateChange: handleRecordingStateChange,
+    getRecordingState: () => ipcRenderer.invoke('get-recording-state'),
     showMainPanel: () => ipcRenderer.send('show-main-panel'),
     showMiniPanel: () => ipcRenderer.send('show-mini-panel'),
 });

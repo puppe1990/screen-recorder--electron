@@ -54,12 +54,16 @@ let cameraWindow;
 let teleprompterWindow;
 let timerWindow;
 let miniPanelWindow;
+let currentRecordingState = false;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
-function createControlWindow() {
+function createControlWindow(options) {
+    const shouldShow = options?.show ?? true;
     // Don't create if already exists
     if (controlWindow && !controlWindow.isDestroyed()) {
-        controlWindow.show();
-        controlWindow.focus();
+        if (shouldShow) {
+            controlWindow.show();
+            controlWindow.focus();
+        }
         return;
     }
     const preloadPath = path.join(__dirname, 'preload.js');
@@ -71,7 +75,7 @@ function createControlWindow() {
         height: 600,
         icon: fs.existsSync(iconPath) ? iconPath : undefined,
         title: 'Studio Recorder',
-        show: true, // Ensure window is shown
+        show: shouldShow, // Ensure window is shown
         webPreferences: {
             preload: preloadPath,
             contextIsolation: true,
@@ -79,7 +83,9 @@ function createControlWindow() {
         },
     });
     // Open DevTools for debugging
-    controlWindow.webContents.openDevTools();
+    if (shouldShow) {
+        controlWindow.webContents.openDevTools();
+    }
     if (VITE_DEV_SERVER_URL) {
         controlWindow.loadURL(`${VITE_DEV_SERVER_URL}#/control`);
     }
@@ -92,7 +98,7 @@ function createControlWindow() {
         if (controlWindow) {
             controlWindow.setContentProtection(true);
             // Force show window after protection is set (macOS workaround)
-            if (process.platform === 'darwin') {
+            if (shouldShow && process.platform === 'darwin') {
                 controlWindow.show();
                 app.dock?.show();
             }
@@ -103,11 +109,15 @@ function createControlWindow() {
     });
 }
 function createMiniPanelWindow() {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    const panelWidth = 760;
+    const panelHeight = 130;
+    const bottomMargin = 20;
     miniPanelWindow = new BrowserWindow({
-        width: 680,
-        height: 80,
-        x: screen.getPrimaryDisplay().workAreaSize.width / 2 - 340,
-        y: screen.getPrimaryDisplay().workAreaSize.height - 100,
+        width: panelWidth,
+        height: panelHeight,
+        x: Math.floor((width - panelWidth) / 2),
+        y: height - (panelHeight + bottomMargin),
         frame: false,
         transparent: true,
         alwaysOnTop: false,
@@ -272,6 +282,7 @@ app.whenReady().then(() => {
         }));
         return filteredSources;
     });
+    ipcMain.handle('get-recording-state', async () => currentRecordingState);
     ipcMain.on('set-camera-shape', (_, shape) => {
         console.log('Received set-camera-shape:', shape);
         if (cameraWindow) {
@@ -327,6 +338,16 @@ app.whenReady().then(() => {
         }
         else {
             console.error('Camera window is null');
+        }
+    });
+    ipcMain.on('broadcast-recording-state', (_, isRecording) => {
+        console.log('Recording state changed:', isRecording);
+        currentRecordingState = isRecording;
+        if (miniPanelWindow && !miniPanelWindow.isDestroyed()) {
+            miniPanelWindow.webContents.send('recording-state-changed', isRecording);
+        }
+        if (timerWindow && !timerWindow.isDestroyed()) {
+            timerWindow.webContents.send('recording-state-changed', isRecording);
         }
     });
     ipcMain.handle('save-recording', async (_, buffer, extension = 'webm', format) => {
@@ -506,6 +527,30 @@ app.whenReady().then(() => {
         if (timerWindow && !timerWindow.isDestroyed()) {
             timerWindow.close();
             timerWindow = null;
+        }
+    });
+    ipcMain.on('start-recording', () => {
+        console.log('Start recording requested from mini panel');
+        const sendStart = () => {
+            if (controlWindow && !controlWindow.isDestroyed()) {
+                controlWindow.webContents.send('start-recording-trigger');
+            }
+            else {
+                console.warn('Control window missing when trying to start recording');
+            }
+        };
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            if (controlWindow.webContents.isLoading()) {
+                controlWindow.webContents.once('did-finish-load', sendStart);
+            }
+            else {
+                sendStart();
+            }
+            return;
+        }
+        createControlWindow({ show: false });
+        if (controlWindow) {
+            controlWindow.webContents.once('did-finish-load', sendStart);
         }
     });
     ipcMain.on('stop-recording', () => {

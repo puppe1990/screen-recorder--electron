@@ -17,6 +17,11 @@ export interface IElectronAPI {
     hideTimer: () => void;
     stopRecording: () => void;
     onStopRecordingTrigger: (callback: () => void) => () => void;
+    startRecording: () => void;
+    onStartRecordingTrigger: (callback: () => void) => () => void;
+    broadcastRecordingState: (isRecording: boolean) => void;
+    onRecordingStateChange: (callback: (isRecording: boolean) => void) => () => void;
+    getRecordingState: () => Promise<boolean>;
     showMainPanel: () => void;
     showMiniPanel: () => void;
 }

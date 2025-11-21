@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Video, Settings, Circle, MousePointer2, Type, Monitor, Minimize2 } from 'lucide-react';
 import PreviewPlayer from './PreviewPlayer';
 
@@ -53,7 +53,7 @@ const ControlPanel = () => {
         }
     }, []);
 
-    const startRecording = async () => {
+    const startRecording = useCallback(async () => {
         try {
             if (!selectedSourceId) {
                 console.error('No source selected');
@@ -349,7 +349,7 @@ const ControlPanel = () => {
             setIsRecording(false);
             // Control window remains visible (doesn't need to be shown)
         }
-    };
+    }, [selectedSourceId, videoFormat]);
 
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -408,6 +408,21 @@ const ControlPanel = () => {
         setShowPreview(false);
         setPreviewBlob(null);
     };
+
+    useEffect(() => {
+        if (window.electronAPI && window.electronAPI.onStartRecordingTrigger) {
+            const cleanup = window.electronAPI.onStartRecordingTrigger(() => {
+                startRecording();
+            });
+            return cleanup;
+        }
+    }, [startRecording]);
+
+    useEffect(() => {
+        if (window.electronAPI && window.electronAPI.broadcastRecordingState) {
+            window.electronAPI.broadcastRecordingState(isRecording);
+        }
+    }, [isRecording]);
 
     // Listen for stop recording from timer window
     useEffect(() => {
