@@ -61,10 +61,18 @@ let controlWindow: BrowserWindow | null;
 let cameraWindow: BrowserWindow | null;
 let teleprompterWindow: BrowserWindow | null;
 let timerWindow: BrowserWindow | null;
+let miniPanelWindow: BrowserWindow | null;
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
 function createControlWindow() {
+    // Don't create if already exists
+    if (controlWindow && !controlWindow.isDestroyed()) {
+        controlWindow.show();
+        controlWindow.focus();
+        return;
+    }
+
     const preloadPath = path.join(__dirname, 'preload.js');
     console.log('Preload path for control window:', preloadPath);
     console.log('Preload file exists:', fs.existsSync(preloadPath));
@@ -88,9 +96,9 @@ function createControlWindow() {
     controlWindow.webContents.openDevTools();
 
     if (VITE_DEV_SERVER_URL) {
-        controlWindow.loadURL(VITE_DEV_SERVER_URL as string);
+        controlWindow.loadURL(`${VITE_DEV_SERVER_URL}#/control`);
     } else {
-        controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
+        controlWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'control' });
     }
 
     // Hide control window from screen capture - must be called after load
@@ -104,6 +112,47 @@ function createControlWindow() {
                 app.dock?.show();
             }
         }
+    });
+
+    controlWindow.on('closed', () => {
+        controlWindow = null;
+    });
+}
+
+function createMiniPanelWindow() {
+    miniPanelWindow = new BrowserWindow({
+        width: 680,
+        height: 80,
+        x: screen.getPrimaryDisplay().workAreaSize.width / 2 - 340,
+        y: screen.getPrimaryDisplay().workAreaSize.height - 100,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: false,
+        resizable: false,
+        skipTaskbar: false,
+        hasShadow: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+
+    // Mini panel should not appear in recordings
+    miniPanelWindow.webContents.once('did-finish-load', () => {
+        if (miniPanelWindow) {
+            miniPanelWindow.setContentProtection(true);
+        }
+    });
+
+    if (VITE_DEV_SERVER_URL) {
+        miniPanelWindow.loadURL(`${VITE_DEV_SERVER_URL}#/minipanel`);
+    } else {
+        miniPanelWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'minipanel' });
+    }
+
+    miniPanelWindow.on('closed', () => {
+        miniPanelWindow = null;
     });
 }
 
@@ -222,12 +271,6 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createControlWindow();
-    }
-});
-
 app.whenReady().then(() => {
     // For macOS Continuity Camera support (warning suppression)
     // Note: This warning will still appear in development mode because
@@ -238,9 +281,10 @@ app.whenReady().then(() => {
         // The app will still work; the warning just means Continuity Camera features may be limited
     }
     
-    createControlWindow();
+    // Start with mini panel instead of control window
+    createMiniPanelWindow();
     createCameraWindow();
-    // Teleprompter will be created on demand via button click
+    // Control window and teleprompter will be created on demand
 
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
@@ -510,6 +554,39 @@ app.whenReady().then(() => {
         // Send to control window to stop recording
         if (controlWindow && !controlWindow.isDestroyed()) {
             controlWindow.webContents.send('stop-recording-trigger');
+        }
+    });
+
+    ipcMain.on('show-main-panel', () => {
+        console.log('Show main panel requested');
+        createControlWindow();
+        // Hide mini panel
+        if (miniPanelWindow && !miniPanelWindow.isDestroyed()) {
+            miniPanelWindow.hide();
+        }
+    });
+
+    ipcMain.on('show-mini-panel', () => {
+        console.log('Show mini panel requested');
+        // Show or create mini panel
+        if (miniPanelWindow && !miniPanelWindow.isDestroyed()) {
+            miniPanelWindow.show();
+            miniPanelWindow.focus();
+        } else {
+            createMiniPanelWindow();
+        }
+        // Hide control window
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.hide();
+        }
+    });
+
+    app.on('activate', () => {
+        // On macOS, re-create mini panel if all windows are closed
+        if (process.platform === 'darwin') {
+            if (!miniPanelWindow || miniPanelWindow.isDestroyed()) {
+                createMiniPanelWindow();
+            }
         }
     });
 });

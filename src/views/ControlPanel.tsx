@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Video, Settings, Circle, MousePointer2, Type, Monitor } from 'lucide-react';
+import { Video, Settings, Circle, MousePointer2, Type, Monitor, Minimize2 } from 'lucide-react';
 import PreviewPlayer from './PreviewPlayer';
 
 type VideoFormat = 'webm-vp9' | 'webm-vp8' | 'mp4' | 'webm';
@@ -250,16 +250,30 @@ const ControlPanel = () => {
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Header */}
                 <header className="mb-12">
-                    <div className="flex items-center gap-4 mb-2">
-                        <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
-                            <Video className="w-7 h-7 text-white" />
+                    <div className="flex items-center justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
+                                <Video className="w-7 h-7 text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-300">
+                                    Studio Recorder
+                                </h1>
+                                <p className="text-slate-400 text-sm mt-1">Grave sua tela com qualidade profissional</p>
+                            </div>
                         </div>
-                        <div>
-                            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-300">
-                                Studio Recorder
-                            </h1>
-                            <p className="text-slate-400 text-sm mt-1">Grave sua tela com qualidade profissional</p>
-                        </div>
+                        <button
+                            onClick={() => {
+                                if (window.electronAPI) {
+                                    window.electronAPI.showMiniPanel();
+                                }
+                            }}
+                            className="p-3 bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors flex items-center gap-2"
+                            title="Voltar ao Mini Painel"
+                        >
+                            <Minimize2 className="w-5 h-5 text-slate-300" />
+                            <span className="text-slate-300 text-sm font-medium">Mini Painel</span>
+                        </button>
                     </div>
                 </header>
 

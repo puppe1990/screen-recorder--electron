@@ -3,9 +3,10 @@ import ControlPanel from './views/ControlPanel';
 import CameraOverlay from './views/CameraOverlay';
 import Teleprompter from './views/Teleprompter';
 import RecordingTimer from './views/RecordingTimer';
+import MiniPanel from './views/MiniPanel';
 
 function App() {
-  const [currentView, setCurrentView] = useState('control');
+  const [currentView, setCurrentView] = useState('minipanel');
 
   useEffect(() => {
     // Check if electronAPI is available
@@ -31,8 +32,12 @@ function App() {
       setCurrentView('teleprompter');
     } else if (hash === 'timer') {
       setCurrentView('timer');
-    } else {
+    } else if (hash === 'control') {
       setCurrentView('control');
+    } else if (hash === 'minipanel') {
+      setCurrentView('minipanel');
+    } else {
+      setCurrentView('minipanel');
     }
   }, []);
 
@@ -42,6 +47,7 @@ function App() {
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}
       {currentView === 'timer' && <RecordingTimer />}
+      {currentView === 'minipanel' && <MiniPanel />}
     </div>
   );
 }

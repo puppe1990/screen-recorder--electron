@@ -38,5 +38,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     hideTimer: () => electron_1.ipcRenderer.send('hide-timer'),
     stopRecording: () => electron_1.ipcRenderer.send('stop-recording'),
     onStopRecordingTrigger: handleStopRecordingTrigger,
+    showMainPanel: () => electron_1.ipcRenderer.send('show-main-panel'),
+    showMiniPanel: () => electron_1.ipcRenderer.send('show-mini-panel'),
 });
 //# sourceMappingURL=preload.js.map

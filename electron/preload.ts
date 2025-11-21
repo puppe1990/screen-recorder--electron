@@ -40,4 +40,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hideTimer: () => ipcRenderer.send('hide-timer'),
     stopRecording: () => ipcRenderer.send('stop-recording'),
     onStopRecordingTrigger: handleStopRecordingTrigger,
+    showMainPanel: () => ipcRenderer.send('show-main-panel'),
+    showMiniPanel: () => ipcRenderer.send('show-mini-panel'),
 });

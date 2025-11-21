@@ -17,6 +17,8 @@ export interface IElectronAPI {
     hideTimer: () => void;
     stopRecording: () => void;
     onStopRecordingTrigger: (callback: () => void) => () => void;
+    showMainPanel: () => void;
+    showMiniPanel: () => void;
 }
 
 declare global {
