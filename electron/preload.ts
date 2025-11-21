@@ -30,4 +30,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showControlWindow: () => ipcRenderer.send('show-control-window'),
     hideCameraWindow: () => ipcRenderer.send('hide-camera-window'),
     showCameraWindow: () => ipcRenderer.send('show-camera-window'),
+    showTimer: () => ipcRenderer.send('show-timer'),
+    hideTimer: () => ipcRenderer.send('hide-timer'),
 });

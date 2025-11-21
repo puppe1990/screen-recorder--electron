@@ -52,6 +52,7 @@ console.warn = (...args) => {
 let controlWindow;
 let cameraWindow;
 let teleprompterWindow;
+let timerWindow;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 function createControlWindow() {
     const preloadPath = path.join(__dirname, 'preload.js');
@@ -149,6 +150,43 @@ function createTeleprompterWindow() {
     }
     else {
         teleprompterWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter' });
+    }
+}
+function createTimerWindow() {
+    // Clean up old window if exists
+    if (timerWindow && !timerWindow.isDestroyed()) {
+        timerWindow.destroy();
+    }
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width } = primaryDisplay.workAreaSize;
+    timerWindow = new BrowserWindow({
+        width: 200,
+        height: 60,
+        x: Math.floor((width - 200) / 2), // Center horizontally
+        y: primaryDisplay.workAreaSize.height - 70, // 70px from bottom
+        frame: false,
+        transparent: false,
+        alwaysOnTop: true,
+        resizable: false,
+        skipTaskbar: true,
+        hasShadow: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+    // CRITICAL: Hide timer from screen capture
+    timerWindow.setContentProtection(true);
+    // Handle window close
+    timerWindow.on('closed', () => {
+        timerWindow = null;
+    });
+    if (VITE_DEV_SERVER_URL) {
+        timerWindow.loadURL(`${VITE_DEV_SERVER_URL}#/timer`);
+    }
+    else {
+        timerWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'timer' });
     }
 }
 app.on('window-all-closed', () => {
@@ -412,6 +450,22 @@ app.whenReady().then(() => {
         console.log('Showing camera window');
         if (cameraWindow && !cameraWindow.isDestroyed()) {
             cameraWindow.show();
+        }
+    });
+    ipcMain.on('show-timer', () => {
+        console.log('Showing recording timer');
+        if (timerWindow && !timerWindow.isDestroyed()) {
+            timerWindow.show();
+        }
+        else {
+            createTimerWindow();
+        }
+    });
+    ipcMain.on('hide-timer', () => {
+        console.log('Hiding recording timer');
+        if (timerWindow && !timerWindow.isDestroyed()) {
+            timerWindow.close();
+            timerWindow = null;
         }
     });
 });

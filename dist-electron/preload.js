@@ -29,5 +29,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     showControlWindow: () => electron_1.ipcRenderer.send('show-control-window'),
     hideCameraWindow: () => electron_1.ipcRenderer.send('hide-camera-window'),
     showCameraWindow: () => electron_1.ipcRenderer.send('show-camera-window'),
+    showTimer: () => electron_1.ipcRenderer.send('show-timer'),
+    hideTimer: () => electron_1.ipcRenderer.send('hide-timer'),
 });
 //# sourceMappingURL=preload.js.map

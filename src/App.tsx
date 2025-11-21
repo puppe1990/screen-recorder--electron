@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ControlPanel from './views/ControlPanel';
 import CameraOverlay from './views/CameraOverlay';
 import Teleprompter from './views/Teleprompter';
+import RecordingTimer from './views/RecordingTimer';
 
 function App() {
   const [currentView, setCurrentView] = useState('control');
@@ -28,6 +29,8 @@ function App() {
       setCurrentView('camera');
     } else if (hash === 'teleprompter') {
       setCurrentView('teleprompter');
+    } else if (hash === 'timer') {
+      setCurrentView('timer');
     } else {
       setCurrentView('control');
     }
@@ -38,6 +41,7 @@ function App() {
       {currentView === 'control' && <ControlPanel />}
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}
+      {currentView === 'timer' && <RecordingTimer />}
     </div>
   );
 }

@@ -13,6 +13,8 @@ export interface IElectronAPI {
     showControlWindow: () => void;
     hideCameraWindow: () => void;
     showCameraWindow: () => void;
+    showTimer: () => void;
+    hideTimer: () => void;
 }
 
 declare global {

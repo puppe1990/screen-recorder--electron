@@ -159,6 +159,11 @@ const ControlPanel = () => {
                     } else if (success) {
                         console.log(`Video saved as ${finalExtension} successfully!`);
                     }
+                    
+                    // Hide timer after saving
+                    if (window.electronAPI) {
+                        window.electronAPI.hideTimer();
+                    }
                 } else {
                     // Fallback for browser testing
                     const url = URL.createObjectURL(blob);
@@ -180,6 +185,11 @@ const ControlPanel = () => {
 
             mediaRecorder.start(1000); // Collect data every second
             setIsRecording(true);
+            
+            // Show recording timer
+            if (window.electronAPI) {
+                window.electronAPI.showTimer();
+            }
         } catch (e) {
             console.error('Failed to start recording:', e);
             alert(`Erro ao iniciar gravação: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
@@ -193,6 +203,11 @@ const ControlPanel = () => {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
             // Control window remains visible (doesn't need to be shown)
+            
+            // Hide recording timer
+            if (window.electronAPI) {
+                window.electronAPI.hideTimer();
+            }
         }
     };
 
