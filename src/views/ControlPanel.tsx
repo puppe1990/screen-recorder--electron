@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Video, Settings, Circle, MousePointer2, Type, Monitor } from 'lucide-react';
 
+type VideoFormat = 'webm-vp9' | 'webm-vp8' | 'mp4' | 'webm';
+
 const ControlPanel = () => {
     const [sources, setSources] = useState<{ id: string; name: string; thumbnail: string }[]>([]);
     const [selectedSourceId, setSelectedSourceId] = useState<string>('');
     const [isRecording, setIsRecording] = useState(false);
     const [cameraShape, setCameraShape] = useState<string>('circle');
+    const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
     const cameraShapeRef = useRef<string>('circle');
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -75,9 +78,56 @@ const ControlPanel = () => {
                 window.electronAPI.hideControlWindow();
             }
 
+            // Get MIME type and codec based on selected format
+            let mimeType = 'video/webm;codecs=vp9';
+            let blobType = 'video/webm';
+            let fileExtension = 'webm';
+            
+            switch (videoFormat) {
+                case 'webm-vp9':
+                    mimeType = 'video/webm;codecs=vp9';
+                    blobType = 'video/webm';
+                    fileExtension = 'webm';
+                    break;
+                case 'webm-vp8':
+                    mimeType = 'video/webm;codecs=vp8';
+                    blobType = 'video/webm';
+                    fileExtension = 'webm';
+                    break;
+                case 'mp4':
+                    // Try H.264, fallback to VP9 if not supported
+                    if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) {
+                        mimeType = 'video/mp4;codecs=h264';
+                        blobType = 'video/mp4';
+                        fileExtension = 'mp4';
+                    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+                        mimeType = 'video/webm;codecs=h264';
+                        blobType = 'video/webm';
+                        fileExtension = 'webm';
+                    } else {
+                        // Fallback to VP9
+                        mimeType = 'video/webm;codecs=vp9';
+                        blobType = 'video/webm';
+                        fileExtension = 'webm';
+                    }
+                    break;
+                default:
+                    mimeType = 'video/webm;codecs=vp9';
+                    blobType = 'video/webm';
+                    fileExtension = 'webm';
+            }
+
+            // Check if the MIME type is supported, fallback to VP9 if not
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                console.warn(`MIME type ${mimeType} not supported, falling back to VP9`);
+                mimeType = 'video/webm;codecs=vp9';
+                blobType = 'video/webm';
+                fileExtension = 'webm';
+            }
+
             // Record directly from screen stream (camera window is already visible on screen)
             const mediaRecorder = new MediaRecorder(screenStream, {
-                mimeType: 'video/webm;codecs=vp9',
+                mimeType: mimeType,
                 videoBitsPerSecond: 2500000
             });
             
@@ -91,7 +141,26 @@ const ControlPanel = () => {
             };
 
             mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunksRef.current, { type: 'video/webm;codecs=vp9' });
+                // Determine blob type and extension based on format
+                let finalBlobType = 'video/webm';
+                let finalExtension = 'webm';
+                
+                switch (videoFormat) {
+                    case 'webm-vp9':
+                    case 'webm-vp8':
+                        finalBlobType = 'video/webm';
+                        finalExtension = 'webm';
+                        break;
+                    case 'mp4':
+                        finalBlobType = 'video/mp4';
+                        finalExtension = 'mp4';
+                        break;
+                    default:
+                        finalBlobType = 'video/webm';
+                        finalExtension = 'webm';
+                }
+
+                const blob = new Blob(chunksRef.current, { type: finalBlobType });
 
                 // Stop all tracks to release resources
                 screenStream.getTracks().forEach(track => track.stop());
@@ -103,14 +172,14 @@ const ControlPanel = () => {
 
                 if (window.electronAPI) {
                     const buffer = await blob.arrayBuffer();
-                    await window.electronAPI.saveRecording(buffer);
+                    await window.electronAPI.saveRecording(buffer, finalExtension);
                 } else {
                     // Fallback for browser testing
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `recording-${Date.now()}.webm`;
+                    a.download = `recording-${Date.now()}.${finalExtension}`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
@@ -209,6 +278,33 @@ const ControlPanel = () => {
                                             <MousePointer2 className="w-5 h-5" />
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Video Format Selection */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                                        Formato de Vídeo
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 pr-12 text-white text-base appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none hover:border-slate-600 cursor-pointer"
+                                            value={videoFormat}
+                                            onChange={(e) => setVideoFormat(e.target.value as VideoFormat)}
+                                            disabled={isRecording}
+                                        >
+                                            <option value="webm-vp9" className="bg-slate-800">WebM (VP9) - Alta Qualidade</option>
+                                            <option value="webm-vp8" className="bg-slate-800">WebM (VP8) - Compatível</option>
+                                            <option value="mp4" className="bg-slate-800">MP4 (H.264) - Universal</option>
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <Video className="w-5 h-5" />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        {videoFormat === 'webm-vp9' && 'Melhor qualidade, arquivo menor'}
+                                        {videoFormat === 'webm-vp8' && 'Boa compatibilidade'}
+                                        {videoFormat === 'mp4' && 'Formato mais compatível (pode converter para WebM)'}
+                                    </p>
                                 </div>
 
                                 {/* Recording Button */}

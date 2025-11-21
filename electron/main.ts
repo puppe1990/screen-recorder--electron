@@ -200,10 +200,25 @@ app.whenReady().then(() => {
         }
     });
 
-    ipcMain.handle('save-recording', async (_, buffer) => {
+    ipcMain.handle('save-recording', async (_, buffer, extension = 'webm') => {
+        // Define file filters based on extension
+        const filters: { name: string; extensions: string[] }[] = [];
+        
+        if (extension === 'mp4') {
+            filters.push({ name: 'MP4 Video', extensions: ['mp4'] });
+        } else {
+            filters.push({ name: 'WebM Video', extensions: ['webm'] });
+        }
+        
+        // Add all video formats as options
+        filters.push(
+            { name: 'All Video Formats', extensions: ['webm', 'mp4', 'mov', 'avi'] }
+        );
+
         const { filePath } = await dialog.showSaveDialog({
-            buttonLabel: 'Save video',
-            defaultPath: `recording-${Date.now()}.webm`
+            buttonLabel: 'Salvar vídeo',
+            defaultPath: `recording-${Date.now()}.${extension}`,
+            filters: filters
         });
 
         if (filePath) {
