@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Video, Settings, Circle, MousePointer2, Type, Monitor } from 'lucide-react';
+import PreviewPlayer from './PreviewPlayer';
 
 type VideoFormat = 'webm-vp9' | 'webm-vp8' | 'mp4' | 'webm';
 
@@ -10,6 +11,8 @@ const ControlPanel = () => {
     const [cameraShape, setCameraShape] = useState<string>('circle');
     const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
     const [cameraVisible, setCameraVisible] = useState<boolean>(true);
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
     const cameraShapeRef = useRef<string>('circle');
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -117,63 +120,20 @@ const ControlPanel = () => {
             };
 
             mediaRecorder.onstop = async () => {
-                // Determine extension based on format chosen in the panel
-                // MediaRecorder always records in WebM format, so we store the raw WebM data
-                let finalExtension = 'webm';
-                
-                // Determine final format based on what user selected in the panel
-                switch (videoFormat) {
-                    case 'webm-vp9':
-                    case 'webm-vp8':
-                        finalExtension = 'webm';
-                        break;
-                    case 'mp4':
-                        finalExtension = 'mp4';
-                        break;
-                    default:
-                        finalExtension = 'webm';
-                }
-
                 // Create blob from recorded chunks (always WebM format from MediaRecorder)
                 const blob = new Blob(chunksRef.current, { type: 'video/webm' });
 
                 // Stop all tracks to release resources
                 screenStream.getTracks().forEach(track => track.stop());
 
-                console.log(`Saving recording with format: ${videoFormat}, extension: ${finalExtension}`);
-
-                // Control window remains visible (already visible, doesn't need to be shown)
-
+                // Show preview instead of saving directly
+                setPreviewBlob(blob);
+                setShowPreview(true);
+                
+                // Show control window and hide timer
                 if (window.electronAPI) {
-                    // Show message if converting to MP4
-                    if (videoFormat === 'mp4') {
-                        console.log('Converting WebM to MP4... This may take a moment.');
-                        // You can add a loading state here if needed
-                    }
-                    const buffer = await blob.arrayBuffer();
-                    // Pass the chosen format and extension to main process
-                    // Main process will ensure the file is saved with the correct format
-                    const success = await window.electronAPI.saveRecording(buffer, finalExtension, videoFormat);
-                    if (success && videoFormat === 'mp4') {
-                        console.log('Conversion completed successfully!');
-                    } else if (success) {
-                        console.log(`Video saved as ${finalExtension} successfully!`);
-                    }
-                    
-                    // Hide timer after saving
-                    if (window.electronAPI) {
-                        window.electronAPI.hideTimer();
-                    }
-                } else {
-                    // Fallback for browser testing
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `recording-${Date.now()}.${finalExtension}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
+                    window.electronAPI.hideTimer();
+                    window.electronAPI.showControlWindow();
                 }
             };
 
@@ -203,13 +163,58 @@ const ControlPanel = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
-            
-            // Show control window and hide recording timer
-            if (window.electronAPI) {
-                window.electronAPI.hideTimer();
-                window.electronAPI.showControlWindow();
-            }
         }
+    };
+
+    const handleSaveRecording = async (format: VideoFormat) => {
+        if (!previewBlob) return;
+
+        // Determine extension based on selected format
+        let finalExtension = 'webm';
+        switch (format) {
+            case 'webm-vp9':
+            case 'webm-vp8':
+                finalExtension = 'webm';
+                break;
+            case 'mp4':
+                finalExtension = 'mp4';
+                break;
+            default:
+                finalExtension = 'webm';
+        }
+
+        if (window.electronAPI) {
+            // Show message if converting to MP4
+            if (format === 'mp4') {
+                console.log('Converting WebM to MP4... This may take a moment.');
+            }
+            const buffer = await previewBlob.arrayBuffer();
+            const success = await window.electronAPI.saveRecording(buffer, finalExtension, format);
+            if (success && format === 'mp4') {
+                console.log('Conversion completed successfully!');
+            } else if (success) {
+                console.log(`Video saved as ${finalExtension} successfully!`);
+            }
+        } else {
+            // Fallback for browser testing
+            const url = URL.createObjectURL(previewBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `recording-${Date.now()}.${finalExtension}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Close preview
+        setShowPreview(false);
+        setPreviewBlob(null);
+    };
+
+    const handleCancelPreview = () => {
+        setShowPreview(false);
+        setPreviewBlob(null);
     };
 
     // Listen for stop recording from timer window
@@ -233,7 +238,15 @@ const ControlPanel = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" style={{ pointerEvents: 'auto' }}>
+        <>
+            {showPreview && previewBlob && (
+                <PreviewPlayer
+                    videoBlob={previewBlob}
+                    onSave={handleSaveRecording}
+                    onCancel={handleCancelPreview}
+                />
+            )}
+            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" style={{ pointerEvents: 'auto' }}>
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Header */}
                 <header className="mb-12">
@@ -530,6 +543,7 @@ const ControlPanel = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 
