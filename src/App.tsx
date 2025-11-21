@@ -3,6 +3,7 @@ import ControlPanel from './views/ControlPanel';
 import CameraOverlay from './views/CameraOverlay';
 import Teleprompter from './views/Teleprompter';
 import MiniPanel from './views/MiniPanel';
+import TeleprompterControl from './views/TeleprompterControl';
 
 function App() {
   const [currentView, setCurrentView] = useState('minipanel');
@@ -29,6 +30,8 @@ function App() {
       setCurrentView('camera');
     } else if (hash === 'teleprompter') {
       setCurrentView('teleprompter');
+    } else if (hash === 'teleprompter-control') {
+      setCurrentView('teleprompter-control');
     } else if (hash === 'timer') {
       // Temporizador usa o mesmo mini painel
       setCurrentView('minipanel');
@@ -46,6 +49,7 @@ function App() {
       {currentView === 'control' && <ControlPanel />}
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}
+      {currentView === 'teleprompter-control' && <TeleprompterControl />}
       {currentView === 'minipanel' && <MiniPanel />}
     </div>
   );

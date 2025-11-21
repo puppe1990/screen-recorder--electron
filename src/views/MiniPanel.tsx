@@ -41,8 +41,8 @@ const MiniPanel = () => {
     };
 
     const handleOpenTeleprompter = () => {
-        if (window.electronAPI) {
-            window.electronAPI.openTeleprompter();
+        if (window.electronAPI?.openTeleprompterControl) {
+            window.electronAPI.openTeleprompterControl();
         }
     };
 

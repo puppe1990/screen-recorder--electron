@@ -36,6 +36,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     setTeleprompterText: (text) => electron_1.ipcRenderer.send('set-teleprompter-text', text),
     onTeleprompterTextChange: handleTeleprompterTextChange,
     getTeleprompterText: () => electron_1.ipcRenderer.invoke('get-teleprompter-text'),
+    openTeleprompterControl: () => electron_1.ipcRenderer.send('open-teleprompter-control'),
     saveRecording: (buffer, extension, format) => electron_1.ipcRenderer.invoke('save-recording', buffer, extension, format),
     setCameraSize: (size) => electron_1.ipcRenderer.send('set-camera-size', size),
     closeTeleprompter: () => electron_1.ipcRenderer.send('close-teleprompter'),

@@ -62,6 +62,7 @@ let cameraWindow: BrowserWindow | null;
 let teleprompterWindow: BrowserWindow | null;
 let timerWindow: BrowserWindow | null;
 let miniPanelWindow: BrowserWindow | null;
+let teleprompterControlWindow: BrowserWindow | null;
 let currentRecordingState = false;
 const DEFAULT_TELEPROMPTER_TEXT = 'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
@@ -243,6 +244,39 @@ function createTeleprompterWindow() {
     });
 }
 
+function createTeleprompterControlWindow() {
+    if (teleprompterControlWindow && !teleprompterControlWindow.isDestroyed()) {
+        teleprompterControlWindow.show();
+        teleprompterControlWindow.focus();
+        return;
+    }
+
+    teleprompterControlWindow = new BrowserWindow({
+        width: 700,
+        height: 600,
+        title: 'Teleprompter Control',
+        show: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+
+    // Hide from screen capture and recordings
+    teleprompterControlWindow.setContentProtection(true);
+
+    teleprompterControlWindow.on('closed', () => {
+        teleprompterControlWindow = null;
+    });
+
+    if (VITE_DEV_SERVER_URL) {
+        teleprompterControlWindow.loadURL(`${VITE_DEV_SERVER_URL}#/teleprompter-control`);
+    } else {
+        teleprompterControlWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter-control' });
+    }
+}
+
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
@@ -272,6 +306,7 @@ app.whenReady().then(() => {
                 teleprompterWindow?.getMediaSourceId(),
                 miniPanelWindow?.getMediaSourceId(),
                 timerWindow?.getMediaSourceId(),
+                teleprompterControlWindow?.getMediaSourceId(),
             ].filter((id): id is string => Boolean(id))
         );
 
@@ -290,8 +325,9 @@ app.whenReady().then(() => {
                                       !name.includes('camera') &&
                                       !name.includes('teleprompter');
                 const isTeleprompterWindow = name.includes('teleprompter');
+                const isTeleprompterControl = name.includes('teleprompter control');
                 const isMiniPanel = name.includes('mini panel') || name.includes('mini painel');
-                return !isControlWindow && !isTeleprompterWindow && !isMiniPanel;
+                return !isControlWindow && !isTeleprompterWindow && !isTeleprompterControl && !isMiniPanel;
             })
             // Ensure screens appear first so the default selection targets the full screen
             .sort((a: any, b: any) => {
@@ -340,6 +376,11 @@ app.whenReady().then(() => {
         } else {
             console.error('Teleprompter window is null');
         }
+    });
+
+    ipcMain.on('open-teleprompter-control', () => {
+        console.log('Received open-teleprompter-control IPC message');
+        createTeleprompterControlWindow();
     });
 
     ipcMain.on('set-camera-size', (_, size) => {

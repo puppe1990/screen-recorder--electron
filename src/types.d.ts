@@ -5,6 +5,7 @@ export interface IElectronAPI {
     setTeleprompterText: (text: string) => void;
     onTeleprompterTextChange: (callback: (text: string) => void) => () => void;
     getTeleprompterText: () => Promise<string>;
+    openTeleprompterControl: () => void;
     saveRecording: (buffer: ArrayBuffer, extension?: string, format?: string) => Promise<boolean>;
     setCameraSize: (size: string) => void;
     closeTeleprompter: () => void;
