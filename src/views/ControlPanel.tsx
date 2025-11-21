@@ -60,11 +60,26 @@ const ControlPanel = () => {
                 return;
             }
 
-            // Get screen capture stream
+            // Get screen capture stream with audio
             // The camera window is already visible on screen and will be captured automatically
             // Note: Control window stays visible but won't appear in recording due to setContentProtection(true)
+            // 
+            // IMPORTANT: On macOS, getUserMedia with chromeMediaSource: 'desktop' creates an audio track
+            // but it's typically SILENT - it doesn't actually capture system audio.
+            // This is a macOS limitation - system audio capture requires kernel extensions.
+            // 
+            // The audio track exists and MediaRecorder records it, but the audio will be silent.
+            // To actually capture system audio on macOS, users need:
+            // 1. A virtual audio device like BlackHole (https://github.com/ExistentialAudio/BlackHole)
+            // 2. Or use macOS native screen recording which includes audio
             const screenStream = await navigator.mediaDevices.getUserMedia({
-                audio: false,
+                audio: {
+                    // @ts-ignore - Electron-specific constraints
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: selectedSourceId,
+                    }
+                } as any,
                 video: {
                     // @ts-ignore - Electron-specific constraints
                     mandatory: {
@@ -77,37 +92,197 @@ const ControlPanel = () => {
                     }
                 } as any,
             });
+            
+            console.warn('⚠️ macOS AUDIO LIMITATION: The audio track may exist but be SILENT.');
+            console.warn('   System audio capture on macOS requires a virtual audio device like BlackHole.');
+            console.warn('   Install BlackHole: https://github.com/ExistentialAudio/BlackHole');
+            console.warn('   Vamos tentar usar o microfone se o áudio do sistema não vier junto.');
+
+            // Log stream tracks for debugging
+            const allTracks = screenStream.getTracks();
+            console.log('Screen stream tracks:', allTracks.map(t => ({
+                kind: t.kind,
+                label: t.label,
+                enabled: t.enabled,
+                muted: t.muted,
+                readyState: t.readyState,
+                settings: t.getSettings ? t.getSettings() : 'settings not available'
+            })));
+
+            const audioTracks = screenStream.getAudioTracks();
+            const videoTracks = screenStream.getVideoTracks();
+            console.log('Audio tracks:', audioTracks.length);
+            console.log('Video tracks:', videoTracks.length);
+            
+            // Log detailed audio track info
+            if (audioTracks.length > 0) {
+                audioTracks.forEach((track, index) => {
+                    console.log(`Audio track ${index}:`, {
+                        label: track.label,
+                        enabled: track.enabled,
+                        muted: track.muted,
+                        readyState: track.readyState,
+                        settings: track.getSettings ? track.getSettings() : null
+                    });
+                });
+            }
+
+            // Ensure all audio tracks are enabled
+            audioTracks.forEach((track, index) => {
+                if (!track.enabled) {
+                    console.warn(`Audio track ${index} is disabled, enabling...`);
+                    track.enabled = true;
+                }
+                if (track.muted) {
+                    console.warn(`Audio track ${index} is muted!`);
+                }
+            });
+
+            // Build final stream combining video with system audio plus microphone (mixed into one track)
+            const finalStream = new MediaStream();
+            
+            // Always add video tracks from screen capture
+            screenStream.getVideoTracks().forEach(track => finalStream.addTrack(track));
+            
+            // Collect audio sources to mix
+            const audioStreams: MediaStream[] = [];
+            let micStream: MediaStream | null = null;
+            
+            if (audioTracks.length > 0) {
+                audioStreams.push(new MediaStream(audioTracks));
+                console.log('Using system/desktop audio tracks:', audioTracks.map(t => t.label));
+            } else {
+                console.warn('Nenhuma trilha de áudio de sistema retornada.');
+            }
+
+            // Always try to capture microphone so the user voice is included even when system audio is silent
+            try {
+                micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
+
+                const micTracks = micStream.getAudioTracks();
+                if (micTracks.length > 0) {
+                    audioStreams.push(micStream);
+                    console.log('Áudio do microfone adicionado:', micTracks.map(t => t.label));
+                } else {
+                    console.warn('Nenhuma trilha de microfone retornada.');
+                }
+            } catch (micError) {
+                console.error('Falha ao acessar o microfone:', micError);
+            }
+
+            // Mix all audio inputs into a single track for the recorder
+            let cleanupAudio: (() => void) | null = null;
+            if (audioStreams.length > 0) {
+                const audioContext = new AudioContext();
+                const destination = audioContext.createMediaStreamDestination();
+
+                audioStreams.forEach(stream => {
+                    try {
+                        const source = audioContext.createMediaStreamSource(stream);
+                        source.connect(destination);
+                    } catch (audioNodeError) {
+                        console.error('Erro ao conectar fonte de áudio:', audioNodeError);
+                    }
+                });
+
+                destination.stream.getAudioTracks().forEach(track => finalStream.addTrack(track));
+                cleanupAudio = () => {
+                    audioStreams.forEach(stream => stream.getTracks().forEach(track => track.stop()));
+                    audioContext.close().catch(() => {});
+                };
+            } else {
+                console.warn('A gravação vai continuar sem áudio porque nenhuma fonte foi encontrada.');
+            }
 
             // MediaRecorder always records in WebM format
             // For MP4, we'll convert after recording using ffmpeg
             // Determine MIME type based on selected format (for WebM options)
-            let mimeType = 'video/webm;codecs=vp9';
+            // Include audio codec if audio tracks are available
+            const hasAudio = finalStream.getAudioTracks().length > 0;
+            
+            // Try different MIME types with audio codec included
+            let mimeType = 'video/webm;codecs=vp9,opus'; // VP9 video + Opus audio
+            let fallbackMimeType = 'video/webm;codecs=vp9'; // VP9 video only
+            let fallbackMimeType2 = 'video/webm;codecs=vp8,opus'; // VP8 video + Opus audio
             
             switch (videoFormat) {
                 case 'webm-vp9':
-                    mimeType = 'video/webm;codecs=vp9';
+                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
+                    fallbackMimeType = 'video/webm;codecs=vp9';
                     break;
                 case 'webm-vp8':
-                    mimeType = 'video/webm;codecs=vp8';
+                    mimeType = hasAudio ? 'video/webm;codecs=vp8,opus' : 'video/webm;codecs=vp8';
+                    fallbackMimeType = 'video/webm;codecs=vp8';
                     break;
                 case 'mp4':
                     // Always record in VP9 WebM, will convert to MP4 later
-                    mimeType = 'video/webm;codecs=vp9';
+                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
+                    fallbackMimeType = 'video/webm;codecs=vp9';
                     break;
                 default:
-                    mimeType = 'video/webm;codecs=vp9';
+                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
+                    fallbackMimeType = 'video/webm;codecs=vp9';
             }
 
-            // Check if the MIME type is supported, fallback to VP9 if not
+            // Check if the MIME type is supported, try fallbacks if not
             if (!MediaRecorder.isTypeSupported(mimeType)) {
-                console.warn(`MIME type ${mimeType} not supported, falling back to VP9`);
-                mimeType = 'video/webm;codecs=vp9';
+                console.warn(`MIME type ${mimeType} not supported, trying fallback...`);
+                if (MediaRecorder.isTypeSupported(fallbackMimeType)) {
+                    mimeType = fallbackMimeType;
+                    console.log(`Using fallback MIME type: ${mimeType}`);
+                } else if (hasAudio && MediaRecorder.isTypeSupported(fallbackMimeType2)) {
+                    mimeType = fallbackMimeType2;
+                    console.log(`Using second fallback MIME type: ${mimeType}`);
+                } else {
+                    // Last resort: let MediaRecorder choose
+                    mimeType = '';
+                    console.warn('No specific MIME type supported, MediaRecorder will choose default');
+                }
+            } else {
+                console.log(`Using MIME type: ${mimeType} (audio: ${hasAudio})`);
             }
 
             // Record directly from screen stream (camera window is already visible on screen)
-            const mediaRecorder = new MediaRecorder(screenStream, {
-                mimeType: mimeType,
+            // Configure MediaRecorder with audio support
+            const mediaRecorderOptions: MediaRecorderOptions = {
                 videoBitsPerSecond: 2500000
+            };
+
+            // Only set mimeType if we have one (empty string means MediaRecorder chooses)
+            if (mimeType) {
+                mediaRecorderOptions.mimeType = mimeType;
+            }
+
+            // Add audio configuration if audio tracks are available
+            const audioTrackCount = finalStream.getAudioTracks().length;
+            if (audioTrackCount > 0) {
+                mediaRecorderOptions.audioBitsPerSecond = 128000; // 128 kbps for audio
+                console.log('MediaRecorder configured with audio:', {
+                    ...mediaRecorderOptions,
+                    audioTracks: audioTrackCount
+                });
+            } else {
+                console.warn('MediaRecorder will record without audio (no audio tracks available)');
+            }
+
+            const mediaRecorder = new MediaRecorder(finalStream, mediaRecorderOptions);
+            
+            // Log MediaRecorder state and capabilities
+            console.log('MediaRecorder created:', {
+                mimeType: mediaRecorder.mimeType,
+                state: mediaRecorder.state,
+                videoBitsPerSecond: mediaRecorder.videoBitsPerSecond,
+                audioBitsPerSecond: mediaRecorder.audioBitsPerSecond,
+                stream: {
+                    audioTracks: finalStream.getAudioTracks().length,
+                    videoTracks: finalStream.getVideoTracks().length
+                }
             });
             
             mediaRecorderRef.current = mediaRecorder;
@@ -122,9 +297,25 @@ const ControlPanel = () => {
             mediaRecorder.onstop = async () => {
                 // Create blob from recorded chunks (always WebM format from MediaRecorder)
                 const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                
+                // Log blob info for debugging
+                console.log('Recording stopped. Blob info:', {
+                    size: blob.size,
+                    type: blob.type,
+                    chunks: chunksRef.current.length,
+                    totalChunksSize: chunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0)
+                });
 
                 // Stop all tracks to release resources
-                screenStream.getTracks().forEach(track => track.stop());
+                finalStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log(`Stopped ${track.kind} track:`, {
+                        label: track.label,
+                        enabled: track.enabled,
+                        muted: track.muted
+                    });
+                });
+                cleanupAudio?.();
 
                 // Show preview instead of saving directly
                 setPreviewBlob(blob);
@@ -139,6 +330,7 @@ const ControlPanel = () => {
 
             mediaRecorder.onerror = (e) => {
                 console.error('MediaRecorder error:', e);
+                cleanupAudio?.();
                 setIsRecording(false);
                 // Control window remains visible (doesn't need to be shown)
             };

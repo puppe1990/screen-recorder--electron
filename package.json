@@ -58,8 +58,12 @@
       "category": "public.app-category.utilities",
       "icon": "public/icon.png",
       "extendInfo": {
-        "NSCameraUseContinuityCameraDeviceType": true
-      }
+        "NSCameraUseContinuityCameraDeviceType": true,
+        "NSMicrophoneUsageDescription": "Este app precisa de acesso ao microfone para gravar áudio durante a gravação de tela.",
+        "NSScreenCaptureUsageDescription": "Este app precisa de acesso à captura de tela para gravar vídeos e áudio do sistema."
+      },
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist"
     }
   }
 }
