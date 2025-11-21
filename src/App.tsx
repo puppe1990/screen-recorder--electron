@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import ControlPanel from './views/ControlPanel';
 import CameraOverlay from './views/CameraOverlay';
 import Teleprompter from './views/Teleprompter';
-import RecordingTimer from './views/RecordingTimer';
 import MiniPanel from './views/MiniPanel';
 
 function App() {
@@ -31,7 +30,8 @@ function App() {
     } else if (hash === 'teleprompter') {
       setCurrentView('teleprompter');
     } else if (hash === 'timer') {
-      setCurrentView('timer');
+      // Temporizador usa o mesmo mini painel
+      setCurrentView('minipanel');
     } else if (hash === 'control') {
       setCurrentView('control');
     } else if (hash === 'minipanel') {
@@ -46,7 +46,6 @@ function App() {
       {currentView === 'control' && <ControlPanel />}
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}
-      {currentView === 'timer' && <RecordingTimer />}
       {currentView === 'minipanel' && <MiniPanel />}
     </div>
   );

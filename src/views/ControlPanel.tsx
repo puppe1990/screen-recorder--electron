@@ -338,9 +338,9 @@ const ControlPanel = () => {
             mediaRecorder.start(1000); // Collect data every second
             setIsRecording(true);
             
-            // Show recording timer and hide control window
+            // Hide control window and ensure mini panel is visible
             if (window.electronAPI) {
-                window.electronAPI.showTimer();
+                window.electronAPI.showMiniPanel();
                 window.electronAPI.hideControlWindow();
             }
         } catch (e) {
@@ -433,9 +433,8 @@ const ControlPanel = () => {
                     mediaRecorderRef.current.stop();
                     setIsRecording(false);
                     
-                    // Show control window and hide recording timer
+                    // Show control window again
                     if (window.electronAPI) {
-                        window.electronAPI.hideTimer();
                         window.electronAPI.showControlWindow();
                     }
                 }

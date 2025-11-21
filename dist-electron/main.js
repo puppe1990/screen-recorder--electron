@@ -206,43 +206,6 @@ function createTeleprompterWindow() {
         teleprompterWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter' });
     }
 }
-function createTimerWindow() {
-    // Clean up old window if exists
-    if (timerWindow && !timerWindow.isDestroyed()) {
-        timerWindow.destroy();
-    }
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width } = primaryDisplay.workAreaSize;
-    timerWindow = new BrowserWindow({
-        width: 720,
-        height: 80,
-        x: Math.floor((width - 720) / 2), // Center horizontally
-        y: primaryDisplay.workAreaSize.height - 100, // 100px from bottom
-        frame: false,
-        transparent: true,
-        alwaysOnTop: true,
-        resizable: false,
-        skipTaskbar: true,
-        hasShadow: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-        },
-    });
-    // CRITICAL: Hide timer from screen capture
-    timerWindow.setContentProtection(true);
-    // Handle window close
-    timerWindow.on('closed', () => {
-        timerWindow = null;
-    });
-    if (VITE_DEV_SERVER_URL) {
-        timerWindow.loadURL(`${VITE_DEV_SERVER_URL}#/timer`);
-    }
-    else {
-        timerWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'timer' });
-    }
-}
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
@@ -514,16 +477,23 @@ app.whenReady().then(() => {
         }
     });
     ipcMain.on('show-timer', () => {
-        console.log('Showing recording timer');
-        if (timerWindow && !timerWindow.isDestroyed()) {
-            timerWindow.show();
+        console.log('Showing recording timer (using mini panel)');
+        if (miniPanelWindow && !miniPanelWindow.isDestroyed()) {
+            miniPanelWindow.show();
+            miniPanelWindow.focus();
         }
         else {
-            createTimerWindow();
+            createMiniPanelWindow();
+        }
+        // If a legacy timer window exists, close it to avoid duplicates
+        if (timerWindow && !timerWindow.isDestroyed()) {
+            timerWindow.close();
+            timerWindow = null;
         }
     });
     ipcMain.on('hide-timer', () => {
-        console.log('Hiding recording timer');
+        console.log('Hiding recording timer (no-op, single mini panel flow)');
+        // We keep the mini panel visible to maintain unified controls
         if (timerWindow && !timerWindow.isDestroyed()) {
             timerWindow.close();
             timerWindow = null;

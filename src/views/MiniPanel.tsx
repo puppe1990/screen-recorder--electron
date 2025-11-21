@@ -6,6 +6,7 @@ const MiniPanel = () => {
     const [cameraSize, setCameraSize] = useState<string>('medium');
     const [cameraVisible, setCameraVisible] = useState<boolean>(true);
     const [isRecording, setIsRecording] = useState<boolean>(false);
+    const [seconds, setSeconds] = useState<number>(0);
 
     const handleCameraShape = (shape: string) => {
         setCameraShape(shape);
@@ -65,6 +66,34 @@ const MiniPanel = () => {
             cleanup?.();
         };
     }, []);
+
+    useEffect(() => {
+        let intervalId: number | undefined;
+        if (isRecording) {
+            intervalId = window.setInterval(() => {
+                setSeconds((s) => s + 1);
+            }, 1000);
+        } else {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setSeconds(0);
+        }
+        return () => {
+            if (intervalId) {
+                window.clearInterval(intervalId);
+            }
+        };
+    }, [isRecording]);
+
+    const formatTime = (totalSeconds: number) => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
 
     const handleToggleRecording = () => {
         if (!window.electronAPI) return;
@@ -172,6 +201,25 @@ const MiniPanel = () => {
                         >
                             {cameraVisible ? <Eye className="w-4 h-4 text-white" /> : <EyeOff className="w-4 h-4 text-slate-300" />}
                         </button>
+                    </div>
+
+                    {/* Timer / status */}
+                    <div 
+                        className="flex items-center gap-3 ml-auto pl-4 border-l border-slate-700"
+                        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                    >
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex h-3 w-3">
+                                {isRecording && (
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                                )}
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${isRecording ? 'bg-red-500' : 'bg-slate-500'}`}></span>
+                            </div>
+                            <span className="text-white font-semibold text-sm font-mono tracking-wide">
+                                {isRecording ? formatTime(seconds) : '00:00'}
+                            </span>
+                            <span className="text-xs text-slate-400">{isRecording ? 'Gravando' : 'Pronto'}</span>
+                        </div>
                     </div>
                 </div>
 
