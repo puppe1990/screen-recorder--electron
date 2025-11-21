@@ -11,6 +11,43 @@ process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.
 
 const DIST_PATH = process.env.DIST!;
 
+// Suppress DevTools autofill protocol errors (harmless warnings)
+process.on('uncaughtException', (error) => {
+    if (error.message?.includes('Autofill') || error.message?.includes('wasn\'t found')) {
+        // Silently ignore DevTools autofill errors
+        return;
+    }
+    // Re-throw other errors
+    throw error;
+});
+
+// Suppress console errors for DevTools protocol issues and harmless warnings
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+console.error = (...args: any[]) => {
+    const message = args.join(' ');
+    // Filter out DevTools autofill errors
+    if (message.includes('Autofill.enable') || 
+        message.includes('Autofill.setAddresses') ||
+        (message.includes("wasn't found") && message.includes('Autofill'))) {
+        return; // Suppress these errors
+    }
+    // Filter out harmless sysctlbyname warnings
+    if (message.includes('sysctlbyname') && message.includes('kern.hv_vmm_present')) {
+        return; // Suppress sysctlbyname warnings
+    }
+    originalConsoleError.apply(console, args);
+};
+console.warn = (...args: any[]) => {
+    const message = args.join(' ');
+    // Filter out NSCameraUseContinuityCameraDeviceType warning
+    if (message.includes('NSCameraUseContinuityCameraDeviceType') || 
+        message.includes('Info.plist')) {
+        return; // Suppress camera warning (handled in production builds)
+    }
+    originalConsoleWarn.apply(console, args);
+};
+
 let controlWindow: BrowserWindow | null;
 let cameraWindow: BrowserWindow | null;
 let teleprompterWindow: BrowserWindow | null;
@@ -129,6 +166,15 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+    // For macOS Continuity Camera support (warning suppression)
+    // Note: This warning will still appear in development mode because
+    // Info.plist modification requires app rebuild. In production builds,
+    // the electron-builder config in package.json will handle this.
+    if (process.platform === 'darwin' && !app.isPackaged) {
+        // In development, we can't easily modify Info.plist, but the warning is harmless
+        // The app will still work; the warning just means Continuity Camera features may be limited
+    }
+    
     createControlWindow();
     createCameraWindow();
     // Teleprompter will be created on demand via button click
