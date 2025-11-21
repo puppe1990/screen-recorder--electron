@@ -160,10 +160,10 @@ function createTimerWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width } = primaryDisplay.workAreaSize;
     timerWindow = new BrowserWindow({
-        width: 200,
-        height: 60,
-        x: Math.floor((width - 200) / 2), // Center horizontally
-        y: primaryDisplay.workAreaSize.height - 70, // 70px from bottom
+        width: 500,
+        height: 70,
+        x: Math.floor((width - 500) / 2), // Center horizontally
+        y: primaryDisplay.workAreaSize.height - 80, // 80px from bottom
         frame: false,
         transparent: false,
         alwaysOnTop: true,
@@ -466,6 +466,13 @@ app.whenReady().then(() => {
         if (timerWindow && !timerWindow.isDestroyed()) {
             timerWindow.close();
             timerWindow = null;
+        }
+    });
+    ipcMain.on('stop-recording', () => {
+        console.log('Stop recording triggered from timer window');
+        // Send to control window to stop recording
+        if (controlWindow && !controlWindow.isDestroyed()) {
+            controlWindow.webContents.send('stop-recording-trigger');
         }
     });
 });

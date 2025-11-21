@@ -186,9 +186,10 @@ const ControlPanel = () => {
             mediaRecorder.start(1000); // Collect data every second
             setIsRecording(true);
             
-            // Show recording timer
+            // Show recording timer and hide control window
             if (window.electronAPI) {
                 window.electronAPI.showTimer();
+                window.electronAPI.hideControlWindow();
             }
         } catch (e) {
             console.error('Failed to start recording:', e);
@@ -202,14 +203,25 @@ const ControlPanel = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
-            // Control window remains visible (doesn't need to be shown)
             
-            // Hide recording timer
+            // Show control window and hide recording timer
             if (window.electronAPI) {
                 window.electronAPI.hideTimer();
+                window.electronAPI.showControlWindow();
             }
         }
     };
+
+    // Listen for stop recording from timer window
+    useEffect(() => {
+        if (window.electronAPI && window.electronAPI.onStopRecordingTrigger) {
+            const cleanup = window.electronAPI.onStopRecordingTrigger(() => {
+                console.log('Stop recording triggered from timer');
+                stopRecording();
+            });
+            return cleanup;
+        }
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" style={{ pointerEvents: 'auto' }}>

@@ -15,6 +15,12 @@ const handleTeleprompterTextChange = (callback: (text: string) => void) => {
     return () => ipcRenderer.removeListener('teleprompter-text-changed', handler);
 };
 
+const handleStopRecordingTrigger = (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('stop-recording-trigger', handler);
+    return () => ipcRenderer.removeListener('stop-recording-trigger', handler);
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
     getSources: () => ipcRenderer.invoke('get-sources'),
     setCameraShape: (shape: string) => ipcRenderer.send('set-camera-shape', shape),
@@ -32,4 +38,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showCameraWindow: () => ipcRenderer.send('show-camera-window'),
     showTimer: () => ipcRenderer.send('show-timer'),
     hideTimer: () => ipcRenderer.send('hide-timer'),
+    stopRecording: () => ipcRenderer.send('stop-recording'),
+    onStopRecordingTrigger: handleStopRecordingTrigger,
 });

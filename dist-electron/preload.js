@@ -14,6 +14,11 @@ const handleTeleprompterTextChange = (callback) => {
     // Return cleanup function (though in practice, listeners persist for window lifetime)
     return () => electron_1.ipcRenderer.removeListener('teleprompter-text-changed', handler);
 };
+const handleStopRecordingTrigger = (callback) => {
+    const handler = () => callback();
+    electron_1.ipcRenderer.on('stop-recording-trigger', handler);
+    return () => electron_1.ipcRenderer.removeListener('stop-recording-trigger', handler);
+};
 electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     getSources: () => electron_1.ipcRenderer.invoke('get-sources'),
     setCameraShape: (shape) => electron_1.ipcRenderer.send('set-camera-shape', shape),
@@ -31,5 +36,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     showCameraWindow: () => electron_1.ipcRenderer.send('show-camera-window'),
     showTimer: () => electron_1.ipcRenderer.send('show-timer'),
     hideTimer: () => electron_1.ipcRenderer.send('hide-timer'),
+    stopRecording: () => electron_1.ipcRenderer.send('stop-recording'),
+    onStopRecordingTrigger: handleStopRecordingTrigger,
 });
 //# sourceMappingURL=preload.js.map

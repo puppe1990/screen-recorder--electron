@@ -15,6 +15,8 @@ export interface IElectronAPI {
     showCameraWindow: () => void;
     showTimer: () => void;
     hideTimer: () => void;
+    stopRecording: () => void;
+    onStopRecordingTrigger: (callback: () => void) => () => void;
 }
 
 declare global {
