@@ -46,7 +46,7 @@ const Teleprompter = () => {
   };
 
   return (
-    <div className="w-full h-full bg-black/50 text-white p-4 overflow-hidden relative" style={{ WebkitAppRegion: 'drag' }}>
+    <div className="w-full h-full bg-black/50 text-white p-4 overflow-hidden relative drag-region">
       {/* Close button */}
       <button
         onClick={handleClose}
@@ -58,9 +58,8 @@ const Teleprompter = () => {
           e.preventDefault();
           e.stopPropagation();
         }}
-        className="absolute top-2 right-2 z-[9999] p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800"
+        className="absolute top-2 right-2 z-[9999] p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800 no-drag"
         style={{ 
-          WebkitAppRegion: 'no-drag',
           pointerEvents: 'auto',
           userSelect: 'none',
           zIndex: 9999
@@ -70,7 +69,7 @@ const Teleprompter = () => {
         <X className="w-6 h-6" />
       </button>
       
-      <div className="animate-scroll text-2xl font-bold leading-relaxed text-center whitespace-pre-wrap" style={{ WebkitAppRegion: 'drag' }}>
+      <div className="animate-scroll text-2xl font-bold leading-relaxed text-center whitespace-pre-wrap drag-region">
         {text}
       </div>
       <style>{`
@@ -80,6 +79,12 @@ const Teleprompter = () => {
         }
         .animate-scroll {
           animation: scroll 20s linear infinite;
+        }
+        .drag-region {
+          -webkit-app-region: drag;
+        }
+        .no-drag {
+          -webkit-app-region: no-drag;
         }
       `}</style>
     </div>

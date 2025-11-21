@@ -28,4 +28,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openTeleprompter: () => ipcRenderer.send('open-teleprompter'),
     hideControlWindow: () => ipcRenderer.send('hide-control-window'),
     showControlWindow: () => ipcRenderer.send('show-control-window'),
+    hideCameraWindow: () => ipcRenderer.send('hide-camera-window'),
+    showCameraWindow: () => ipcRenderer.send('show-camera-window'),
 });

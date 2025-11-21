@@ -22,9 +22,12 @@ function createControlWindow() {
     console.log('Preload path for control window:', preloadPath);
     console.log('Preload file exists:', fs.existsSync(preloadPath));
     
+    const iconPath = path.join(process.env.VITE_PUBLIC || DIST_PATH, 'icon.png');
+    
     controlWindow = new BrowserWindow({
         width: 800,
         height: 600,
+        icon: fs.existsSync(iconPath) ? iconPath : undefined,
         webPreferences: {
             preload: preloadPath,
             contextIsolation: true,
@@ -280,6 +283,20 @@ app.whenReady().then(() => {
         if (controlWindow && !controlWindow.isDestroyed()) {
             controlWindow.show();
             controlWindow.focus();
+        }
+    });
+
+    ipcMain.on('hide-camera-window', () => {
+        console.log('Hiding camera window');
+        if (cameraWindow && !cameraWindow.isDestroyed()) {
+            cameraWindow.hide();
+        }
+    });
+
+    ipcMain.on('show-camera-window', () => {
+        console.log('Showing camera window');
+        if (cameraWindow && !cameraWindow.isDestroyed()) {
+            cameraWindow.show();
         }
     });
 });

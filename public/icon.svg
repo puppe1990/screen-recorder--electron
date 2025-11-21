@@ -1,0 +1,35 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <circle cx="256" cy="256" r="256" fill="url(#gradient)"/>
+  
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Screen/Monitor frame -->
+  <rect x="80" y="100" width="352" height="240" rx="20" fill="white" opacity="0.95"/>
+  <rect x="100" y="120" width="312" height="200" rx="10" fill="#1e293b"/>
+  
+  <!-- Screen content lines -->
+  <line x1="140" y1="160" x2="372" y2="160" stroke="#3b82f6" stroke-width="8" stroke-linecap="round"/>
+  <line x1="140" y1="200" x2="300" y2="200" stroke="#60a5fa" stroke-width="6" stroke-linecap="round"/>
+  <line x1="140" y1="240" x2="280" y2="240" stroke="#60a5fa" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Monitor stand -->
+  <rect x="220" y="340" width="72" height="40" rx="8" fill="white" opacity="0.95"/>
+  <rect x="200" y="380" width="112" height="20" rx="10" fill="white" opacity="0.95"/>
+  
+  <!-- Recording indicator (red circle) -->
+  <circle cx="380" cy="140" r="24" fill="#ef4444"/>
+  <circle cx="380" cy="140" r="16" fill="white"/>
+  
+  <!-- Camera overlay (small circle in corner) -->
+  <circle cx="380" cy="280" r="40" fill="white" opacity="0.9"/>
+  <circle cx="380" cy="280" r="32" fill="#1e293b"/>
+  <circle cx="380" cy="280" r="20" fill="#3b82f6"/>
+</svg>
+

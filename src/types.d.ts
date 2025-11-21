@@ -11,6 +11,8 @@ export interface IElectronAPI {
     openTeleprompter: () => void;
     hideControlWindow: () => void;
     showControlWindow: () => void;
+    hideCameraWindow: () => void;
+    showCameraWindow: () => void;
 }
 
 declare global {

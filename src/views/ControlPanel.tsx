@@ -9,6 +9,7 @@ const ControlPanel = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [cameraShape, setCameraShape] = useState<string>('circle');
     const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
+    const [cameraVisible, setCameraVisible] = useState<boolean>(true);
     const cameraShapeRef = useRef<string>('circle');
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -80,49 +81,33 @@ const ControlPanel = () => {
 
             // Get MIME type and codec based on selected format
             let mimeType = 'video/webm;codecs=vp9';
-            let blobType = 'video/webm';
-            let fileExtension = 'webm';
             
             switch (videoFormat) {
                 case 'webm-vp9':
                     mimeType = 'video/webm;codecs=vp9';
-                    blobType = 'video/webm';
-                    fileExtension = 'webm';
                     break;
                 case 'webm-vp8':
                     mimeType = 'video/webm;codecs=vp8';
-                    blobType = 'video/webm';
-                    fileExtension = 'webm';
                     break;
                 case 'mp4':
                     // Try H.264, fallback to VP9 if not supported
                     if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) {
                         mimeType = 'video/mp4;codecs=h264';
-                        blobType = 'video/mp4';
-                        fileExtension = 'mp4';
                     } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
                         mimeType = 'video/webm;codecs=h264';
-                        blobType = 'video/webm';
-                        fileExtension = 'webm';
                     } else {
                         // Fallback to VP9
                         mimeType = 'video/webm;codecs=vp9';
-                        blobType = 'video/webm';
-                        fileExtension = 'webm';
                     }
                     break;
                 default:
                     mimeType = 'video/webm;codecs=vp9';
-                    blobType = 'video/webm';
-                    fileExtension = 'webm';
             }
 
             // Check if the MIME type is supported, fallback to VP9 if not
             if (!MediaRecorder.isTypeSupported(mimeType)) {
                 console.warn(`MIME type ${mimeType} not supported, falling back to VP9`);
                 mimeType = 'video/webm;codecs=vp9';
-                blobType = 'video/webm';
-                fileExtension = 'webm';
             }
 
             // Record directly from screen stream (camera window is already visible on screen)
@@ -477,6 +462,39 @@ const ControlPanel = () => {
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+
+                                {/* Camera Visibility Toggle */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                        <Video className="w-4 h-4" />
+                                        Visibilidade da Câmera
+                                    </label>
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const newVisibility = !cameraVisible;
+                                            setCameraVisible(newVisibility);
+                                            console.log('Setting camera visibility to:', newVisibility);
+                                            if (window.electronAPI) {
+                                                if (newVisibility) {
+                                                    window.electronAPI.showCameraWindow();
+                                                } else {
+                                                    window.electronAPI.hideCameraWindow();
+                                                }
+                                            } else {
+                                                console.error('electronAPI not available');
+                                            }
+                                        }}
+                                        className={`w-full p-3.5 bg-slate-900/80 border-2 rounded-xl transition-all text-sm font-medium cursor-pointer text-left ${
+                                            cameraVisible
+                                                ? 'border-green-500 bg-green-500/10 text-green-300'
+                                                : 'border-slate-700 hover:border-slate-600 hover:bg-slate-800 text-slate-300'
+                                        }`}
+                                    >
+                                        {cameraVisible ? '✓ Câmera Visível' : '✗ Câmera Ocultada'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
