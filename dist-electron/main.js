@@ -160,16 +160,16 @@ function createTimerWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width } = primaryDisplay.workAreaSize;
     timerWindow = new BrowserWindow({
-        width: 500,
-        height: 70,
-        x: Math.floor((width - 500) / 2), // Center horizontally
-        y: primaryDisplay.workAreaSize.height - 80, // 80px from bottom
+        width: 720,
+        height: 80,
+        x: Math.floor((width - 720) / 2), // Center horizontally
+        y: primaryDisplay.workAreaSize.height - 100, // 100px from bottom
         frame: false,
-        transparent: false,
+        transparent: true,
         alwaysOnTop: true,
         resizable: false,
         skipTaskbar: true,
-        hasShadow: true,
+        hasShadow: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
