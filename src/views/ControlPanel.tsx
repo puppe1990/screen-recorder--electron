@@ -38,8 +38,8 @@ const ControlPanel = () => {
                 return;
             }
 
-            // In Electron, we need to use the correct constraints format
-            const stream = await navigator.mediaDevices.getUserMedia({
+            // Get screen capture stream
+            const screenStream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
                     // @ts-ignore - Electron-specific constraints
@@ -54,7 +54,91 @@ const ControlPanel = () => {
                 } as any,
             });
 
-            const mediaRecorder = new MediaRecorder(stream, {
+            // Get camera stream
+            let cameraStream: MediaStream | null = null;
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        width: 300, 
+                        height: 300,
+                        facingMode: 'user'
+                    },
+                    audio: false,
+                });
+            } catch (cameraError) {
+                console.warn('Could not access camera, recording without camera overlay:', cameraError);
+            }
+
+            // Combine streams using Canvas API
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                throw new Error('Could not get canvas context');
+            }
+
+            // Set canvas size to match screen stream
+            const screenVideo = document.createElement('video');
+            screenVideo.srcObject = screenStream;
+            screenVideo.autoplay = true;
+            screenVideo.muted = true;
+            await new Promise((resolve) => {
+                screenVideo.onloadedmetadata = () => {
+                    canvas.width = screenVideo.videoWidth;
+                    canvas.height = screenVideo.videoHeight;
+                    resolve(null);
+                };
+            });
+
+            let cameraVideo: HTMLVideoElement | null = null;
+            if (cameraStream) {
+                cameraVideo = document.createElement('video');
+                cameraVideo.srcObject = cameraStream;
+                cameraVideo.autoplay = true;
+                cameraVideo.muted = true;
+                await new Promise((resolve) => {
+                    cameraVideo!.onloadedmetadata = () => resolve(null);
+                });
+            }
+
+            // Draw function to combine streams
+            const draw = () => {
+                if (!ctx) return;
+                
+                // Draw screen
+                ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+                
+                // Draw camera overlay in bottom right corner
+                if (cameraVideo) {
+                    const cameraSize = 300;
+                    const x = canvas.width - cameraSize - 20;
+                    const y = canvas.height - cameraSize - 20;
+                    
+                    // Draw circular mask for camera
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x + cameraSize / 2, y + cameraSize / 2, cameraSize / 2, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(cameraVideo, x, y, cameraSize, cameraSize);
+                    ctx.restore();
+                    
+                    // Draw border
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(x + cameraSize / 2, y + cameraSize / 2, cameraSize / 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                requestAnimationFrame(draw);
+            };
+            
+            draw();
+
+            // Get stream from canvas
+            const combinedStream = canvas.captureStream(30); // 30 FPS
+
+            const mediaRecorder = new MediaRecorder(combinedStream, {
                 mimeType: 'video/webm;codecs=vp9',
                 videoBitsPerSecond: 2500000
             });
@@ -72,7 +156,14 @@ const ControlPanel = () => {
                 const blob = new Blob(chunksRef.current, { type: 'video/webm;codecs=vp9' });
 
                 // Stop all tracks to release resources
-                stream.getTracks().forEach(track => track.stop());
+                screenStream.getTracks().forEach(track => track.stop());
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
+                screenVideo.srcObject = null;
+                if (cameraVideo) {
+                    cameraVideo.srcObject = null;
+                }
 
                 if (window.electronAPI) {
                     const buffer = await blob.arrayBuffer();

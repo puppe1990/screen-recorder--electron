@@ -44,12 +44,15 @@ function createCameraWindow() {
         alwaysOnTop: true,
         hasShadow: false,
         resizable: true,
+        skipTaskbar: false, // Make sure it appears in task switcher
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
         },
     });
+    // Make sure camera window is visible for screen capture
+    cameraWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     if (VITE_DEV_SERVER_URL) {
         cameraWindow.loadURL(`${VITE_DEV_SERVER_URL}#/camera`);
     }
