@@ -28,7 +28,8 @@ const ControlPanel = () => {
                     console.log('Sources received:', sources);
                     setSources(sources);
                     if (sources.length > 0) {
-                        setSelectedSourceId(sources[0].id);
+                        const preferredSource = sources.find((source) => source.id.startsWith('screen:')) || sources[0];
+                        setSelectedSourceId(preferredSource.id);
                     }
                 } catch (error) {
                     console.error('Error getting sources:', error);

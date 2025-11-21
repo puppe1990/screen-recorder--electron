@@ -226,17 +226,35 @@ app.whenReady().then(() => {
     // Control window and teleprompter will be created on demand
     // IPC Handlers
     ipcMain.handle('get-sources', async () => {
+        const excludedSourceIds = new Set([
+            controlWindow?.getMediaSourceId(),
+            teleprompterWindow?.getMediaSourceId(),
+            miniPanelWindow?.getMediaSourceId(),
+            timerWindow?.getMediaSourceId(),
+        ].filter((id) => Boolean(id)));
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
         // Filter out control window and teleprompter window from sources by name
         const filteredSources = sources
             .filter((source) => {
+            if (excludedSourceIds.has(source.id)) {
+                return false;
+            }
             // Exclude control window and teleprompter window by name
             const name = source.name.toLowerCase();
-            const isControlWindow = name.includes('screen-recorder-electron') &&
+            const isControlWindow = (name.includes('screen-recorder-electron') || name.includes('studio recorder')) &&
                 !name.includes('camera') &&
                 !name.includes('teleprompter');
             const isTeleprompterWindow = name.includes('teleprompter');
-            return !isControlWindow && !isTeleprompterWindow;
+            const isMiniPanel = name.includes('mini panel') || name.includes('mini painel');
+            return !isControlWindow && !isTeleprompterWindow && !isMiniPanel;
+        })
+            // Ensure screens appear first so the default selection targets the full screen
+            .sort((a, b) => {
+            const aIsScreen = typeof a.id === 'string' && a.id.startsWith('screen:');
+            const bIsScreen = typeof b.id === 'string' && b.id.startsWith('screen:');
+            if (aIsScreen === bIsScreen)
+                return 0;
+            return aIsScreen ? -1 : 1;
         })
             .map((source) => ({
             id: source.id,
