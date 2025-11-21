@@ -62,6 +62,8 @@ function createControlWindow() {
         width: 800,
         height: 600,
         icon: fs.existsSync(iconPath) ? iconPath : undefined,
+        title: 'Studio Recorder',
+        show: true, // Ensure window is shown
         webPreferences: {
             preload: preloadPath,
             contextIsolation: true,
@@ -77,9 +79,15 @@ function createControlWindow() {
         controlWindow.loadFile(path.join(DIST_PATH, 'index.html'));
     }
     // Hide control window from screen capture - must be called after load
+    // Note: On macOS, this may affect dock icon visibility in some cases
     controlWindow.webContents.once('did-finish-load', () => {
         if (controlWindow) {
             controlWindow.setContentProtection(true);
+            // Force show window after protection is set (macOS workaround)
+            if (process.platform === 'darwin') {
+                controlWindow.show();
+                app.dock?.show();
+            }
         }
     });
 }
@@ -101,8 +109,10 @@ function createCameraWindow() {
             nodeIntegration: false,
         },
     });
-    // Make sure camera window is visible for screen capture
+    // Make sure camera window is visible on all workspaces AND in screen recordings
     cameraWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Camera window is NOT protected - it WILL appear in screen recordings
+    // This is intentional - the camera should be captured as an overlay
     if (VITE_DEV_SERVER_URL) {
         cameraWindow.loadURL(`${VITE_DEV_SERVER_URL}#/camera`);
     }

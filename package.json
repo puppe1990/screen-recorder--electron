@@ -49,8 +49,14 @@
   "build": {
     "appId": "com.screen-recorder-electron.app",
     "productName": "Screen Recorder Electron",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "public/**/*"
+    ],
     "mac": {
       "category": "public.app-category.utilities",
+      "icon": "public/icon.png",
       "extendInfo": {
         "NSCameraUseContinuityCameraDeviceType": true
       }
