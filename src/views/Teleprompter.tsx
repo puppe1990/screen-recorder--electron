@@ -1,21 +1,35 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
+const DEFAULT_TELEPROMPTER_TEXT = 'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
+
 const Teleprompter = () => {
-  const [text, setText] = useState('This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!');
+  const [text, setText] = useState(DEFAULT_TELEPROMPTER_TEXT);
 
   useEffect(() => {
-    if (window.electronAPI) {
-      const handleTextChange = (newText: string) => {
-        setText(newText);
-      };
-      
-      // Register listener
-      window.electronAPI.onTeleprompterTextChange(handleTextChange);
-      
-      // Note: In Electron with contextBridge, listeners are automatically cleaned up
-      // but we can't manually remove them. The listener will persist for the window lifetime.
-    }
+    let isMounted = true;
+    const handleTextChange = (newText: string) => {
+      if (!isMounted) return;
+      setText(newText);
+    };
+
+    const syncInitialText = async () => {
+      if (!window.electronAPI?.getTeleprompterText) return;
+      try {
+        const savedText = await window.electronAPI.getTeleprompterText();
+        if (isMounted && typeof savedText === 'string') {
+          setText(savedText ?? DEFAULT_TELEPROMPTER_TEXT);
+        }
+      } catch (error) {
+        console.error('Failed to load teleprompter text:', error);
+      }
+    };
+
+    syncInitialText();
+
+    const unsubscribe = window.electronAPI?.onTeleprompterTextChange
+      ? window.electronAPI.onTeleprompterTextChange(handleTextChange)
+      : undefined;
 
     // Add keyboard shortcut to close (ESC key)
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -29,6 +43,8 @@ const Teleprompter = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
+      isMounted = false;
+      unsubscribe?.();
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);

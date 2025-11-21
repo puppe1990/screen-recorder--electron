@@ -63,6 +63,8 @@ let teleprompterWindow: BrowserWindow | null;
 let timerWindow: BrowserWindow | null;
 let miniPanelWindow: BrowserWindow | null;
 let currentRecordingState = false;
+const DEFAULT_TELEPROMPTER_TEXT = 'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
+let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
@@ -233,6 +235,12 @@ function createTeleprompterWindow() {
     } else {
         teleprompterWindow.loadFile(path.join(DIST_PATH, 'index.html'), { hash: 'teleprompter' });
     }
+
+    teleprompterWindow.webContents.once('did-finish-load', () => {
+        if (teleprompterWindow) {
+            teleprompterWindow.webContents.send('teleprompter-text-changed', teleprompterText);
+        }
+    });
 }
 
 app.on('window-all-closed', () => {
@@ -302,6 +310,7 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('get-recording-state', async () => currentRecordingState);
+    ipcMain.handle('get-teleprompter-text', async () => teleprompterText);
 
     ipcMain.on('set-camera-shape', (_, shape) => {
         console.log('Received set-camera-shape:', shape);
@@ -324,6 +333,7 @@ app.whenReady().then(() => {
 
     ipcMain.on('set-teleprompter-text', (_, text) => {
         console.log('Received set-teleprompter-text:', text.substring(0, 50) + '...');
+        teleprompterText = text;
         if (teleprompterWindow) {
             console.log('Sending teleprompter-text-changed to teleprompter window');
             teleprompterWindow.webContents.send('teleprompter-text-changed', text);
