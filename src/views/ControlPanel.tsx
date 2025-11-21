@@ -59,6 +59,7 @@ const ControlPanel = () => {
 
             // Get screen capture stream
             // The camera window is already visible on screen and will be captured automatically
+            // Note: Control window stays visible but won't appear in recording due to setContentProtection(true)
             const screenStream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
@@ -74,12 +75,9 @@ const ControlPanel = () => {
                 } as any,
             });
 
-            // Hide control window before recording
-            if (window.electronAPI) {
-                window.electronAPI.hideControlWindow();
-            }
-
-            // Get MIME type and codec based on selected format
+            // MediaRecorder always records in WebM format
+            // For MP4, we'll convert after recording using ffmpeg
+            // Determine MIME type based on selected format (for WebM options)
             let mimeType = 'video/webm;codecs=vp9';
             
             switch (videoFormat) {
@@ -90,15 +88,8 @@ const ControlPanel = () => {
                     mimeType = 'video/webm;codecs=vp8';
                     break;
                 case 'mp4':
-                    // Try H.264, fallback to VP9 if not supported
-                    if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) {
-                        mimeType = 'video/mp4;codecs=h264';
-                    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
-                        mimeType = 'video/webm;codecs=h264';
-                    } else {
-                        // Fallback to VP9
-                        mimeType = 'video/webm;codecs=vp9';
-                    }
+                    // Always record in VP9 WebM, will convert to MP4 later
+                    mimeType = 'video/webm;codecs=vp9';
                     break;
                 default:
                     mimeType = 'video/webm;codecs=vp9';
@@ -150,14 +141,19 @@ const ControlPanel = () => {
                 // Stop all tracks to release resources
                 screenStream.getTracks().forEach(track => track.stop());
 
-                // Show control window after recording stops
-                if (window.electronAPI) {
-                    window.electronAPI.showControlWindow();
-                }
+                // Control window remains visible (already visible, doesn't need to be shown)
 
                 if (window.electronAPI) {
+                    // Show message if converting to MP4
+                    if (videoFormat === 'mp4') {
+                        console.log('Converting WebM to MP4... This may take a moment.');
+                        // You can add a loading state here if needed
+                    }
                     const buffer = await blob.arrayBuffer();
-                    await window.electronAPI.saveRecording(buffer, finalExtension);
+                    const success = await window.electronAPI.saveRecording(buffer, finalExtension);
+                    if (success && videoFormat === 'mp4') {
+                        console.log('Conversion completed successfully!');
+                    }
                 } else {
                     // Fallback for browser testing
                     const url = URL.createObjectURL(blob);
@@ -174,10 +170,7 @@ const ControlPanel = () => {
             mediaRecorder.onerror = (e) => {
                 console.error('MediaRecorder error:', e);
                 setIsRecording(false);
-                // Show control window on error
-                if (window.electronAPI) {
-                    window.electronAPI.showControlWindow();
-                }
+                // Control window remains visible (doesn't need to be shown)
             };
 
             mediaRecorder.start(1000); // Collect data every second
@@ -186,10 +179,7 @@ const ControlPanel = () => {
             console.error('Failed to start recording:', e);
             alert(`Erro ao iniciar gravação: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
             setIsRecording(false);
-            // Show control window on error
-            if (window.electronAPI) {
-                window.electronAPI.showControlWindow();
-            }
+            // Control window remains visible (doesn't need to be shown)
         }
     };
 
@@ -197,10 +187,7 @@ const ControlPanel = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
-            // Show control window after stopping
-            if (window.electronAPI) {
-                window.electronAPI.showControlWindow();
-            }
+            // Control window remains visible (doesn't need to be shown)
         }
     };
 

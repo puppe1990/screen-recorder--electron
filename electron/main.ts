@@ -2,6 +2,15 @@ import { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog } from 'el
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { promisify } from 'util';
+
+const writeFile = promisify(fs.writeFile);
+const unlink = promisify(fs.unlink);
+
+// Set ffmpeg path
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -271,8 +280,63 @@ app.whenReady().then(() => {
         });
 
         if (filePath) {
-            fs.writeFile(filePath, Buffer.from(buffer), () => console.log('Video saved successfully!'));
-            return true;
+            try {
+                // If extension is mp4, we need to convert from WebM
+                // (MediaRecorder always records in WebM format)
+                if (extension === 'mp4') {
+                    // Create temporary WebM file
+                    const tempWebmPath = path.join(app.getPath('temp'), `temp-recording-${Date.now()}.webm`);
+                    await writeFile(tempWebmPath, Buffer.from(buffer));
+                    
+                    console.log('Converting WebM to MP4...');
+                    console.log('Temp file:', tempWebmPath);
+                    console.log('Output file:', filePath);
+                    
+                    // Convert WebM to MP4 using ffmpeg
+                    await new Promise<void>((resolve, reject) => {
+                        ffmpeg(tempWebmPath)
+                            .outputOptions([
+                                '-c:v libx264',
+                                '-preset fast',
+                                '-crf 23',
+                                '-c:a aac',
+                                '-b:a 128k',
+                                '-movflags +faststart' // For web playback
+                            ])
+                            .output(filePath)
+                            .on('end', () => {
+                                console.log('Conversion completed successfully');
+                                // Delete temporary file
+                                unlink(tempWebmPath).catch(err => {
+                                    console.warn('Failed to delete temp file:', err);
+                                });
+                                resolve();
+                            })
+                            .on('error', (err: Error) => {
+                                console.error('FFmpeg conversion error:', err);
+                                // Delete temporary file even on error
+                                unlink(tempWebmPath).catch(() => {});
+                                reject(err);
+                            })
+                            .on('progress', (progress: { percent?: number }) => {
+                                if (progress.percent) {
+                                    console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+                                }
+                            })
+                            .run();
+                    });
+                    
+                    console.log('Video converted and saved successfully!');
+                } else {
+                    // Save WebM directly
+                    await writeFile(filePath, Buffer.from(buffer));
+                    console.log('Video saved successfully!');
+                }
+                return true;
+            } catch (error) {
+                console.error('Error saving video:', error);
+                return false;
+            }
         }
         return false;
     });
