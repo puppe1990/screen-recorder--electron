@@ -217,7 +217,16 @@ const ControlPanel = () => {
         if (window.electronAPI && window.electronAPI.onStopRecordingTrigger) {
             const cleanup = window.electronAPI.onStopRecordingTrigger(() => {
                 console.log('Stop recording triggered from timer');
-                stopRecording();
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                    
+                    // Show control window and hide recording timer
+                    if (window.electronAPI) {
+                        window.electronAPI.hideTimer();
+                        window.electronAPI.showControlWindow();
+                    }
+                }
             });
             return cleanup;
         }
