@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Square, Circle, Eye, EyeOff, GripVertical } from 'lucide-react';
+import type { CameraShape, CameraSize } from '../../electron/ipc-contract';
 
 const RecordingTimer = () => {
     const [seconds, setSeconds] = useState(0);
-    const [cameraShape, setCameraShape] = useState<string>('circle');
-    const [cameraSize, setCameraSize] = useState<string>('medium');
+    const [cameraShape, setCameraShape] = useState<CameraShape>('circle');
+    const [cameraSize, setCameraSize] = useState<CameraSize>('medium');
     const [cameraVisible, setCameraVisible] = useState<boolean>(true);
 
     useEffect(() => {
@@ -33,14 +34,14 @@ const RecordingTimer = () => {
         }
     };
 
-    const handleCameraShape = (shape: string) => {
+    const handleCameraShape = (shape: CameraShape) => {
         setCameraShape(shape);
         if (window.electronAPI) {
             window.electronAPI.setCameraShape(shape);
         }
     };
 
-    const handleCameraSize = (size: string) => {
+    const handleCameraSize = (size: CameraSize) => {
         setCameraSize(size);
         if (window.electronAPI) {
             window.electronAPI.setCameraSize(size);
@@ -170,4 +171,3 @@ const RecordingTimer = () => {
 };
 
 export default RecordingTimer;
-

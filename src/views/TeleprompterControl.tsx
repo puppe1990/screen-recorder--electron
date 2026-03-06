@@ -126,9 +126,9 @@ const TeleprompterControl = () => {
               Dicas rápidas
             </div>
             <ul className="space-y-2 text-sm text-slate-400 list-disc list-inside">
-              <li>Use o botão Abrir para mostrar a janela do teleprompter flutuante.</li>
+              <li>Use Abrir para exibir o teleprompter flutuante sem fechar este painel.</li>
               <li>Edite o texto aqui e veja a atualização em tempo real.</li>
-              <li>Feche quando terminar para tirar o overlay da frente.</li>
+              <li>Use Fechar apenas para recolher o overlay da leitura.</li>
             </ul>
             <div className="text-xs text-slate-500 border-t border-slate-800 pt-3">
               A janela do teleprompter não aparece na gravação porque tem proteção de captura ativada.

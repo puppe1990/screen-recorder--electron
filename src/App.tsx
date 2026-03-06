@@ -1,48 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import ControlPanel from './views/ControlPanel';
 import CameraOverlay from './views/CameraOverlay';
 import Teleprompter from './views/Teleprompter';
 import MiniPanel from './views/MiniPanel';
 import TeleprompterControl from './views/TeleprompterControl';
 
-function App() {
-  const [currentView, setCurrentView] = useState('minipanel');
+const resolveViewFromHash = (hash: string) => {
+  switch (hash.replace('#/', '').replace('#', '')) {
+    case 'camera':
+      return 'camera';
+    case 'teleprompter':
+      return 'teleprompter';
+    case 'teleprompter-control':
+      return 'teleprompter-control';
+    case 'control':
+      return 'control';
+    case 'minipanel':
+    case 'timer':
+    default:
+      return 'minipanel';
+  }
+};
 
-  useEffect(() => {
-    // Check if electronAPI is available
-    console.log('=== App mounted ===');
-    console.log('window.electronAPI:', window.electronAPI);
-    console.log('typeof window.electronAPI:', typeof window.electronAPI);
-    console.log('window:', window);
-    
-    // Test if we can access electronAPI methods
-    if (window.electronAPI) {
-      console.log('✅ electronAPI is available!');
-      console.log('Available methods:', Object.keys(window.electronAPI));
-    } else {
-      console.error('❌ electronAPI is NOT available!');
-      console.error('This might be a preload script issue.');
-    }
-    
-    const hash = window.location.hash.replace('#/', '').replace('#', '');
-    console.log('Current hash:', hash);
-    if (hash === 'camera') {
-      setCurrentView('camera');
-    } else if (hash === 'teleprompter') {
-      setCurrentView('teleprompter');
-    } else if (hash === 'teleprompter-control') {
-      setCurrentView('teleprompter-control');
-    } else if (hash === 'timer') {
-      // Temporizador usa o mesmo mini painel
-      setCurrentView('minipanel');
-    } else if (hash === 'control') {
-      setCurrentView('control');
-    } else if (hash === 'minipanel') {
-      setCurrentView('minipanel');
-    } else {
-      setCurrentView('minipanel');
-    }
-  }, []);
+function App() {
+  const [currentView] = useState(() => resolveViewFromHash(window.location.hash));
 
   return (
     <div className="h-screen w-screen overflow-auto">

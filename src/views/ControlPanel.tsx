@@ -1,771 +1,571 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Video, Settings, Circle, MousePointer2, Type, Monitor, Minimize2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Circle, Eye, EyeOff, Minimize2, Monitor, MousePointer2, Type, Video } from 'lucide-react';
+import type {
+  CameraShape,
+  CameraSize,
+  DesktopSource,
+  SaveRecordingResult,
+  VideoFormat,
+} from '../../electron/ipc-contract';
 import PreviewPlayer from './PreviewPlayer';
+import {
+  getFormatHelperText,
+  getSaveResultMessage,
+  resolveRecorderMimeType,
+  resolveSaveExtension,
+} from '../lib/recording';
 
-type VideoFormat = 'webm-vp9' | 'webm-vp8' | 'mp4' | 'webm';
+type PanelPhase = 'idle' | 'recording' | 'preview' | 'saving' | 'error';
+
+interface CaptureBundle {
+  stream: MediaStream;
+  cleanup: () => void;
+  hasSystemAudio: boolean;
+  hasMicrophoneAudio: boolean;
+}
+
+const SCREEN_CAPTURE_CONSTRAINTS = {
+  minWidth: 1280,
+  maxWidth: 1920,
+  minHeight: 720,
+  maxHeight: 1080,
+};
+
+const stopTracks = (tracks: MediaStreamTrack[]) => {
+  tracks.forEach((track) => {
+    if (track.readyState !== 'ended') {
+      track.stop();
+    }
+  });
+};
+
+const createCaptureBundle = async (selectedSourceId: string): Promise<CaptureBundle> => {
+  const screenStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      // @ts-expect-error Electron desktop capture constraints
+      mandatory: {
+        chromeMediaSource: 'desktop',
+        chromeMediaSourceId: selectedSourceId,
+      },
+    },
+    video: {
+      // @ts-expect-error Electron desktop capture constraints
+      mandatory: {
+        chromeMediaSource: 'desktop',
+        chromeMediaSourceId: selectedSourceId,
+        ...SCREEN_CAPTURE_CONSTRAINTS,
+      },
+    },
+  });
+
+  const finalStream = new MediaStream();
+  screenStream.getVideoTracks().forEach((track) => finalStream.addTrack(track));
+
+  const systemAudioTracks = screenStream.getAudioTracks();
+  systemAudioTracks.forEach((track) => {
+    track.enabled = true;
+  });
+
+  const audioStreams: MediaStream[] = [];
+  if (systemAudioTracks.length > 0) {
+    audioStreams.push(new MediaStream(systemAudioTracks));
+  }
+
+  let microphoneStream: MediaStream | null = null;
+  try {
+    microphoneStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+
+    if (microphoneStream.getAudioTracks().length > 0) {
+      audioStreams.push(microphoneStream);
+    }
+  } catch {
+    microphoneStream = null;
+  }
+
+  let audioContext: AudioContext | null = null;
+  if (audioStreams.length > 0) {
+    audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+
+    audioStreams.forEach((stream) => {
+      audioContext!.createMediaStreamSource(stream).connect(destination);
+    });
+
+    destination.stream.getAudioTracks().forEach((track) => finalStream.addTrack(track));
+  }
+
+  const cleanup = () => {
+    const uniqueTracks = new Set<MediaStreamTrack>([
+      ...screenStream.getTracks(),
+      ...finalStream.getTracks(),
+      ...audioStreams.flatMap((stream) => stream.getTracks()),
+    ]);
+
+    stopTracks([...uniqueTracks]);
+    if (audioContext) {
+      void audioContext.close().catch(() => undefined);
+    }
+  };
+
+  return {
+    stream: finalStream,
+    cleanup,
+    hasSystemAudio: systemAudioTracks.length > 0,
+    hasMicrophoneAudio: Boolean(microphoneStream?.getAudioTracks().length),
+  };
+};
 
 const ControlPanel = () => {
-    const [sources, setSources] = useState<{ id: string; name: string; thumbnail: string }[]>([]);
-    const [selectedSourceId, setSelectedSourceId] = useState<string>('');
-    const [isRecording, setIsRecording] = useState(false);
-    const [cameraShape, setCameraShape] = useState<string>('circle');
-    const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
-    const [cameraVisible, setCameraVisible] = useState<boolean>(true);
-    const [showPreview, setShowPreview] = useState(false);
-    const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
-    const cameraShapeRef = useRef<string>('circle');
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
+  const [sources, setSources] = useState<DesktopSource[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState('');
+  const [cameraShape, setCameraShape] = useState<CameraShape>('circle');
+  const [cameraSize, setCameraSize] = useState<CameraSize>('medium');
+  const [cameraVisible, setCameraVisible] = useState(true);
+  const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
+  const [phase, setPhase] = useState<PanelPhase>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [audioNotice, setAudioNotice] = useState(
+    'No macOS, o áudio do sistema pode não estar disponível sem um driver virtual como BlackHole. O app tenta adicionar o microfone automaticamente.'
+  );
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const cleanupCaptureRef = useRef<(() => void) | null>(null);
 
-    useEffect(() => {
-        console.log('ControlPanel mounted');
-        console.log('window.electronAPI available:', !!window.electronAPI);
-        
-        const getSources = async () => {
-            if (window.electronAPI) {
-                try {
-                    const sources = await window.electronAPI.getSources();
-                    console.log('Sources received:', sources);
-                    setSources(sources);
-                    if (sources.length > 0) {
-                        const preferredSource = sources.find((source) => source.id.startsWith('screen:')) || sources[0];
-                        setSelectedSourceId(preferredSource.id);
-                    }
-                } catch (error) {
-                    console.error('Error getting sources:', error);
-                }
-            } else {
-                console.warn('electronAPI not available - running in browser mode?');
-            }
-        };
-        getSources();
-    }, []);
+  const isRecording = phase === 'recording';
+  const isSaving = phase === 'saving';
 
-    // Listen for camera shape changes
-    useEffect(() => {
-        if (window.electronAPI) {
-            const handleShapeChange = (newShape: string) => {
-                console.log('Camera shape changed to:', newShape);
-                setCameraShape(newShape);
-                cameraShapeRef.current = newShape; // Update ref for recording
-            };
-            
-            window.electronAPI.onCameraShapeChange(handleShapeChange);
+  useEffect(() => {
+    const loadSources = async () => {
+      try {
+        const nextSources = await window.electronAPI.getSources();
+        setSources(nextSources);
+        if (nextSources.length > 0) {
+          const preferredSource = nextSources.find((source) => source.id.startsWith('screen:')) ?? nextSources[0];
+          setSelectedSourceId(preferredSource.id);
         }
-    }, []);
-
-    const startRecording = useCallback(async () => {
-        try {
-            if (!selectedSourceId) {
-                console.error('No source selected');
-                return;
-            }
-
-            // Get screen capture stream with audio
-            // The camera window is already visible on screen and will be captured automatically
-            // Note: Control window stays visible but won't appear in recording due to setContentProtection(true)
-            // 
-            // IMPORTANT: On macOS, getUserMedia with chromeMediaSource: 'desktop' creates an audio track
-            // but it's typically SILENT - it doesn't actually capture system audio.
-            // This is a macOS limitation - system audio capture requires kernel extensions.
-            // 
-            // The audio track exists and MediaRecorder records it, but the audio will be silent.
-            // To actually capture system audio on macOS, users need:
-            // 1. A virtual audio device like BlackHole (https://github.com/ExistentialAudio/BlackHole)
-            // 2. Or use macOS native screen recording which includes audio
-            const screenStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    // @ts-ignore - Electron-specific constraints
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: selectedSourceId,
-                    }
-                } as any,
-                video: {
-                    // @ts-ignore - Electron-specific constraints
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: selectedSourceId,
-                        minWidth: 1280,
-                        maxWidth: 1920,
-                        minHeight: 720,
-                        maxHeight: 1080
-                    }
-                } as any,
-            });
-            
-            console.warn('⚠️ macOS AUDIO LIMITATION: The audio track may exist but be SILENT.');
-            console.warn('   System audio capture on macOS requires a virtual audio device like BlackHole.');
-            console.warn('   Install BlackHole: https://github.com/ExistentialAudio/BlackHole');
-            console.warn('   Vamos tentar usar o microfone se o áudio do sistema não vier junto.');
-
-            // Log stream tracks for debugging
-            const allTracks = screenStream.getTracks();
-            console.log('Screen stream tracks:', allTracks.map(t => ({
-                kind: t.kind,
-                label: t.label,
-                enabled: t.enabled,
-                muted: t.muted,
-                readyState: t.readyState,
-                settings: t.getSettings ? t.getSettings() : 'settings not available'
-            })));
-
-            const audioTracks = screenStream.getAudioTracks();
-            const videoTracks = screenStream.getVideoTracks();
-            console.log('Audio tracks:', audioTracks.length);
-            console.log('Video tracks:', videoTracks.length);
-            
-            // Log detailed audio track info
-            if (audioTracks.length > 0) {
-                audioTracks.forEach((track, index) => {
-                    console.log(`Audio track ${index}:`, {
-                        label: track.label,
-                        enabled: track.enabled,
-                        muted: track.muted,
-                        readyState: track.readyState,
-                        settings: track.getSettings ? track.getSettings() : null
-                    });
-                });
-            }
-
-            // Ensure all audio tracks are enabled
-            audioTracks.forEach((track, index) => {
-                if (!track.enabled) {
-                    console.warn(`Audio track ${index} is disabled, enabling...`);
-                    track.enabled = true;
-                }
-                if (track.muted) {
-                    console.warn(`Audio track ${index} is muted!`);
-                }
-            });
-
-            // Build final stream combining video with system audio plus microphone (mixed into one track)
-            const finalStream = new MediaStream();
-            
-            // Always add video tracks from screen capture
-            screenStream.getVideoTracks().forEach(track => finalStream.addTrack(track));
-            
-            // Collect audio sources to mix
-            const audioStreams: MediaStream[] = [];
-            let micStream: MediaStream | null = null;
-            
-            if (audioTracks.length > 0) {
-                audioStreams.push(new MediaStream(audioTracks));
-                console.log('Using system/desktop audio tracks:', audioTracks.map(t => t.label));
-            } else {
-                console.warn('Nenhuma trilha de áudio de sistema retornada.');
-            }
-
-            // Always try to capture microphone so the user voice is included even when system audio is silent
-            try {
-                micStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                    },
-                });
-
-                const micTracks = micStream.getAudioTracks();
-                if (micTracks.length > 0) {
-                    audioStreams.push(micStream);
-                    console.log('Áudio do microfone adicionado:', micTracks.map(t => t.label));
-                } else {
-                    console.warn('Nenhuma trilha de microfone retornada.');
-                }
-            } catch (micError) {
-                console.error('Falha ao acessar o microfone:', micError);
-            }
-
-            // Mix all audio inputs into a single track for the recorder
-            let cleanupAudio: (() => void) | null = null;
-            if (audioStreams.length > 0) {
-                const audioContext = new AudioContext();
-                const destination = audioContext.createMediaStreamDestination();
-
-                audioStreams.forEach(stream => {
-                    try {
-                        const source = audioContext.createMediaStreamSource(stream);
-                        source.connect(destination);
-                    } catch (audioNodeError) {
-                        console.error('Erro ao conectar fonte de áudio:', audioNodeError);
-                    }
-                });
-
-                destination.stream.getAudioTracks().forEach(track => finalStream.addTrack(track));
-                cleanupAudio = () => {
-                    audioStreams.forEach(stream => stream.getTracks().forEach(track => track.stop()));
-                    audioContext.close().catch(() => {});
-                };
-            } else {
-                console.warn('A gravação vai continuar sem áudio porque nenhuma fonte foi encontrada.');
-            }
-
-            // MediaRecorder always records in WebM format
-            // For MP4, we'll convert after recording using ffmpeg
-            // Determine MIME type based on selected format (for WebM options)
-            // Include audio codec if audio tracks are available
-            const hasAudio = finalStream.getAudioTracks().length > 0;
-            
-            // Try different MIME types with audio codec included
-            let mimeType = 'video/webm;codecs=vp9,opus'; // VP9 video + Opus audio
-            let fallbackMimeType = 'video/webm;codecs=vp9'; // VP9 video only
-            let fallbackMimeType2 = 'video/webm;codecs=vp8,opus'; // VP8 video + Opus audio
-            
-            switch (videoFormat) {
-                case 'webm-vp9':
-                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
-                    fallbackMimeType = 'video/webm;codecs=vp9';
-                    break;
-                case 'webm-vp8':
-                    mimeType = hasAudio ? 'video/webm;codecs=vp8,opus' : 'video/webm;codecs=vp8';
-                    fallbackMimeType = 'video/webm;codecs=vp8';
-                    break;
-                case 'mp4':
-                    // Always record in VP9 WebM, will convert to MP4 later
-                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
-                    fallbackMimeType = 'video/webm;codecs=vp9';
-                    break;
-                default:
-                    mimeType = hasAudio ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9';
-                    fallbackMimeType = 'video/webm;codecs=vp9';
-            }
-
-            // Check if the MIME type is supported, try fallbacks if not
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                console.warn(`MIME type ${mimeType} not supported, trying fallback...`);
-                if (MediaRecorder.isTypeSupported(fallbackMimeType)) {
-                    mimeType = fallbackMimeType;
-                    console.log(`Using fallback MIME type: ${mimeType}`);
-                } else if (hasAudio && MediaRecorder.isTypeSupported(fallbackMimeType2)) {
-                    mimeType = fallbackMimeType2;
-                    console.log(`Using second fallback MIME type: ${mimeType}`);
-                } else {
-                    // Last resort: let MediaRecorder choose
-                    mimeType = '';
-                    console.warn('No specific MIME type supported, MediaRecorder will choose default');
-                }
-            } else {
-                console.log(`Using MIME type: ${mimeType} (audio: ${hasAudio})`);
-            }
-
-            // Record directly from screen stream (camera window is already visible on screen)
-            // Configure MediaRecorder with audio support
-            const mediaRecorderOptions: MediaRecorderOptions = {
-                videoBitsPerSecond: 2500000
-            };
-
-            // Only set mimeType if we have one (empty string means MediaRecorder chooses)
-            if (mimeType) {
-                mediaRecorderOptions.mimeType = mimeType;
-            }
-
-            // Add audio configuration if audio tracks are available
-            const audioTrackCount = finalStream.getAudioTracks().length;
-            if (audioTrackCount > 0) {
-                mediaRecorderOptions.audioBitsPerSecond = 128000; // 128 kbps for audio
-                console.log('MediaRecorder configured with audio:', {
-                    ...mediaRecorderOptions,
-                    audioTracks: audioTrackCount
-                });
-            } else {
-                console.warn('MediaRecorder will record without audio (no audio tracks available)');
-            }
-
-            const mediaRecorder = new MediaRecorder(finalStream, mediaRecorderOptions);
-            
-            // Log MediaRecorder state and capabilities
-            console.log('MediaRecorder created:', {
-                mimeType: mediaRecorder.mimeType,
-                state: mediaRecorder.state,
-                videoBitsPerSecond: mediaRecorder.videoBitsPerSecond,
-                audioBitsPerSecond: mediaRecorder.audioBitsPerSecond,
-                stream: {
-                    audioTracks: finalStream.getAudioTracks().length,
-                    videoTracks: finalStream.getVideoTracks().length
-                }
-            });
-            
-            mediaRecorderRef.current = mediaRecorder;
-            chunksRef.current = [];
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) {
-                    chunksRef.current.push(e.data);
-                }
-            };
-
-            mediaRecorder.onstop = async () => {
-                // Create blob from recorded chunks (always WebM format from MediaRecorder)
-                const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-                
-                // Log blob info for debugging
-                console.log('Recording stopped. Blob info:', {
-                    size: blob.size,
-                    type: blob.type,
-                    chunks: chunksRef.current.length,
-                    totalChunksSize: chunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0)
-                });
-
-                // Stop all tracks to release resources
-                finalStream.getTracks().forEach(track => {
-                    track.stop();
-                    console.log(`Stopped ${track.kind} track:`, {
-                        label: track.label,
-                        enabled: track.enabled,
-                        muted: track.muted
-                    });
-                });
-                cleanupAudio?.();
-
-                // Show preview instead of saving directly
-                setPreviewBlob(blob);
-                setShowPreview(true);
-                
-                // Show control window and hide timer
-                if (window.electronAPI) {
-                    window.electronAPI.hideTimer();
-                    window.electronAPI.showControlWindow();
-                }
-            };
-
-            mediaRecorder.onerror = (e) => {
-                console.error('MediaRecorder error:', e);
-                cleanupAudio?.();
-                setIsRecording(false);
-                // Control window remains visible (doesn't need to be shown)
-            };
-
-            mediaRecorder.start(1000); // Collect data every second
-            setIsRecording(true);
-            
-            // Hide control window and ensure mini panel is visible
-            if (window.electronAPI) {
-                window.electronAPI.showMiniPanel();
-                window.electronAPI.hideControlWindow();
-            }
-        } catch (e) {
-            console.error('Failed to start recording:', e);
-            alert(`Erro ao iniciar gravação: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
-            setIsRecording(false);
-            // Control window remains visible (doesn't need to be shown)
-        }
-    }, [selectedSourceId, videoFormat]);
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
+        setPhase('error');
+        setErrorMessage(message);
+      }
     };
 
-    const handleSaveRecording = async (format: VideoFormat) => {
-        if (!previewBlob) return;
+    void loadSources();
+  }, []);
 
-        // Determine extension based on selected format
-        let finalExtension = 'webm';
-        switch (format) {
-            case 'webm-vp9':
-            case 'webm-vp8':
-                finalExtension = 'webm';
-                break;
-            case 'mp4':
-                finalExtension = 'mp4';
-                break;
-            default:
-                finalExtension = 'webm';
+  useEffect(() => {
+    const cleanupShape = window.electronAPI.onCameraShapeChange((shape) => {
+      setCameraShape(shape);
+    });
+
+    return cleanupShape;
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI.broadcastRecordingState(isRecording);
+  }, [isRecording]);
+
+  const handleCameraShape = (shape: CameraShape) => {
+    setCameraShape(shape);
+    window.electronAPI.setCameraShape(shape);
+  };
+
+  const handleCameraSize = (size: CameraSize) => {
+    setCameraSize(size);
+    window.electronAPI.setCameraSize(size);
+  };
+
+  const toggleCameraVisibility = () => {
+    const nextVisibility = !cameraVisible;
+    setCameraVisible(nextVisibility);
+    if (nextVisibility) {
+      window.electronAPI.showCameraWindow();
+      return;
+    }
+    window.electronAPI.hideCameraWindow();
+  };
+
+  const clearMessages = () => {
+    setErrorMessage(null);
+    setStatusMessage(null);
+    setSaveError(null);
+  };
+
+  const startRecording = useCallback(async () => {
+    if (!selectedSourceId) {
+      setPhase('error');
+      setErrorMessage('Selecione uma fonte de gravação antes de iniciar.');
+      return;
+    }
+
+    clearMessages();
+
+    let captureBundle: CaptureBundle | null = null;
+
+    try {
+      captureBundle = await createCaptureBundle(selectedSourceId);
+      cleanupCaptureRef.current = captureBundle.cleanup;
+
+      const mimeType = resolveRecorderMimeType(
+        videoFormat,
+        captureBundle.stream.getAudioTracks().length > 0,
+        (candidate) => MediaRecorder.isTypeSupported(candidate)
+      );
+
+      const recorderOptions: MediaRecorderOptions = {
+        videoBitsPerSecond: 2_500_000,
+      };
+
+      if (mimeType) {
+        recorderOptions.mimeType = mimeType;
+      }
+
+      if (captureBundle.stream.getAudioTracks().length > 0) {
+        recorderOptions.audioBitsPerSecond = 128_000;
+      }
+
+      const recorder = new MediaRecorder(captureBundle.stream, recorderOptions);
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
         }
+      };
 
-        if (window.electronAPI) {
-            // Show message if converting to MP4
-            if (format === 'mp4') {
-                console.log('Converting WebM to MP4... This may take a moment.');
-            }
-            const buffer = await previewBlob.arrayBuffer();
-            const success = await window.electronAPI.saveRecording(buffer, finalExtension, format);
-            if (success && format === 'mp4') {
-                console.log('Conversion completed successfully!');
-            } else if (success) {
-                console.log(`Video saved as ${finalExtension} successfully!`);
-            }
-        } else {
-            // Fallback for browser testing
-            const url = URL.createObjectURL(previewBlob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `recording-${Date.now()}.${finalExtension}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-        }
+      recorder.onstop = () => {
+        cleanupCaptureRef.current?.();
+        cleanupCaptureRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        setPreviewBlob(blob);
+        setShowPreview(true);
+        setPhase('preview');
+        window.electronAPI.hideTimer();
+        window.electronAPI.showControlWindow();
+      };
 
-        // Close preview
-        setShowPreview(false);
-        setPreviewBlob(null);
+      recorder.onerror = () => {
+        cleanupCaptureRef.current?.();
+        cleanupCaptureRef.current = null;
+        setPhase('error');
+        setErrorMessage('A gravação falhou antes de finalizar. Tente novamente.');
+        window.electronAPI.showControlWindow();
+      };
+
+      recorder.start(1000);
+      setPhase('recording');
+      setAudioNotice(
+        captureBundle.hasSystemAudio
+          ? captureBundle.hasMicrophoneAudio
+            ? 'Áudio do sistema e microfone adicionados à gravação.'
+            : 'Áudio do sistema detectado. O microfone não foi incluído.'
+          : captureBundle.hasMicrophoneAudio
+            ? 'Sem áudio do sistema. O app adicionou o microfone à gravação.'
+            : 'Nenhuma fonte de áudio disponível. A gravação seguirá sem áudio.'
+      );
+      window.electronAPI.showMiniPanel();
+      window.electronAPI.hideControlWindow();
+    } catch (error) {
+      captureBundle?.cleanup();
+      cleanupCaptureRef.current = null;
+      const message = error instanceof Error ? error.message : 'Erro desconhecido ao iniciar a gravação.';
+      setPhase('error');
+      setErrorMessage(message);
+      window.electronAPI.showControlWindow();
+    }
+  }, [selectedSourceId, videoFormat]);
+
+  const stopRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+    setPhase((currentPhase) => (currentPhase === 'saving' ? currentPhase : 'idle'));
+  }, []);
+
+  useEffect(() => {
+    const cleanupStart = window.electronAPI.onStartRecordingTrigger(() => {
+      void startRecording();
+    });
+
+    const cleanupStop = window.electronAPI.onStopRecordingTrigger(() => {
+      stopRecording();
+    });
+
+    return () => {
+      cleanupStart();
+      cleanupStop();
     };
+  }, [startRecording, stopRecording]);
 
-    const handleCancelPreview = () => {
-        setShowPreview(false);
-        setPreviewBlob(null);
-    };
+  const closePreview = () => {
+    setShowPreview(false);
+    setPreviewBlob(null);
+    setSaveError(null);
+    setPhase('idle');
+  };
 
-    useEffect(() => {
-        if (window.electronAPI && window.electronAPI.onStartRecordingTrigger) {
-            const cleanup = window.electronAPI.onStartRecordingTrigger(() => {
-                startRecording();
-            });
-            return cleanup;
-        }
-    }, [startRecording]);
+  const handleSaveRecording = async (format: VideoFormat) => {
+    if (!previewBlob) return;
 
-    useEffect(() => {
-        if (window.electronAPI && window.electronAPI.broadcastRecordingState) {
-            window.electronAPI.broadcastRecordingState(isRecording);
-        }
-    }, [isRecording]);
+    setPhase('saving');
+    setSaveError(null);
+    setStatusMessage(null);
 
-    // Listen for stop recording from timer window
-    useEffect(() => {
-        if (window.electronAPI && window.electronAPI.onStopRecordingTrigger) {
-            const cleanup = window.electronAPI.onStopRecordingTrigger(() => {
-                console.log('Stop recording triggered from timer');
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                    mediaRecorderRef.current.stop();
-                    setIsRecording(false);
-                    
-                    // Show control window again
-                    if (window.electronAPI) {
-                        window.electronAPI.showControlWindow();
-                    }
-                }
-            });
-            return cleanup;
-        }
-    }, []);
+    const result: SaveRecordingResult = await window.electronAPI.saveRecording({
+      buffer: await previewBlob.arrayBuffer(),
+      format,
+    });
 
-    return (
-        <>
-            {showPreview && previewBlob && (
-                <PreviewPlayer
-                    videoBlob={previewBlob}
-                    onSave={handleSaveRecording}
-                    onCancel={handleCancelPreview}
-                />
-            )}
-            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" style={{ pointerEvents: 'auto' }}>
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                {/* Header */}
-                <header className="mb-12">
-                    <div className="flex items-center justify-between gap-4 mb-2">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
-                                <Video className="w-7 h-7 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-300">
-                                    Studio Recorder
-                                </h1>
-                                <p className="text-slate-400 text-sm mt-1">Grave sua tela com qualidade profissional</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => {
-                                if (window.electronAPI) {
-                                    window.electronAPI.showMiniPanel();
-                                }
-                            }}
-                            className="p-3 bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors flex items-center gap-2"
-                            title="Voltar ao Mini Painel"
-                        >
-                            <Minimize2 className="w-5 h-5 text-slate-300" />
-                            <span className="text-slate-300 text-sm font-medium">Mini Painel</span>
-                        </button>
-                    </div>
-                </header>
+    if (result.ok) {
+      setStatusMessage(getSaveResultMessage(result));
+      closePreview();
+      return;
+    }
 
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Main Recording Section - Takes 2 columns */}
-                    <div className="xl:col-span-2 space-y-6">
-                        {/* Recording Card */}
-                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2.5 bg-blue-500/20 rounded-xl">
-                                    <Monitor className="w-6 h-6 text-blue-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white">Gravação</h2>
-                                    <p className="text-slate-400 text-sm">Selecione a fonte e inicie a gravação</p>
-                                </div>
-                            </div>
+    if (result.code === 'CANCELLED') {
+      setPhase('preview');
+      setStatusMessage(getSaveResultMessage(result));
+      return;
+    }
 
-                            <div className="space-y-6">
-                                {/* Source Selection */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                                        Fonte de Gravação
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 pr-12 text-white text-base appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none hover:border-slate-600 cursor-pointer"
-                                            value={selectedSourceId}
-                                            onChange={(e) => setSelectedSourceId(e.target.value)}
-                                        >
-                                            {sources.length === 0 ? (
-                                                <option value="">Carregando fontes...</option>
-                                            ) : (
-                                                sources.map((source) => (
-                                                    <option key={source.id} value={source.id} className="bg-slate-800">
-                                                        {source.name}
-                                                    </option>
-                                                ))
-                                            )}
-                                        </select>
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                            <MousePointer2 className="w-5 h-5" />
-                                        </div>
-                                    </div>
-                                </div>
+    setPhase('preview');
+    setSaveError(getSaveResultMessage(result));
+  };
 
-                                {/* Video Format Selection */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-300 mb-3">
-                                        Formato de Vídeo
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 pr-12 text-white text-base appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none hover:border-slate-600 cursor-pointer"
-                                            value={videoFormat}
-                                            onChange={(e) => setVideoFormat(e.target.value as VideoFormat)}
-                                            disabled={isRecording}
-                                        >
-                                            <option value="webm-vp9" className="bg-slate-800">WebM (VP9) - Alta Qualidade</option>
-                                            <option value="webm-vp8" className="bg-slate-800">WebM (VP8) - Compatível</option>
-                                            <option value="mp4" className="bg-slate-800">MP4 (H.264) - Universal</option>
-                                        </select>
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                            <Video className="w-5 h-5" />
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-slate-500 mt-2">
-                                        {videoFormat === 'webm-vp9' && 'Melhor qualidade, arquivo menor'}
-                                        {videoFormat === 'webm-vp8' && 'Boa compatibilidade'}
-                                        {videoFormat === 'mp4' && 'Formato mais compatível (pode converter para WebM)'}
-                                    </p>
-                                </div>
+  return (
+    <>
+      {showPreview && previewBlob && (
+        <PreviewPlayer
+          videoBlob={previewBlob}
+          onSave={handleSaveRecording}
+          onCancel={closePreview}
+          isSaving={isSaving}
+          saveError={saveError}
+        />
+      )}
 
-                                {/* Recording Button */}
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        console.log('Recording button clicked, isRecording:', isRecording);
-                                        if (isRecording) {
-                                            stopRecording();
-                                        } else {
-                                            startRecording();
-                                        }
-                                    }}
-                                    disabled={!selectedSourceId || sources.length === 0}
-                                    className={`w-full py-5 rounded-xl font-bold text-lg shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 ${
-                                        isRecording
-                                            ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-red-500/40 text-white'
-                                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-500/40 text-white'
-                                    } disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100`}
-                                >
-                                    {isRecording ? (
-                                        <>
-                                            <span className="relative flex h-4 w-4">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
-                                            </span>
-                                            <span>Parar Gravação</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Video className="w-6 h-6" />
-                                            <span>Iniciar Gravação</span>
-                                        </>
-                                    )}
-                                </button>
-
-                                {isRecording && (
-                                    <div className="flex items-center gap-2 text-red-400 text-sm">
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span>
-                                        </span>
-                                        <span>Gravando em andamento...</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Teleprompter Section */}
-                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 bg-purple-500/20 rounded-xl">
-                                        <Type className="w-6 h-6 text-purple-400" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white">Teleprompter</h2>
-                                        <p className="text-slate-400 text-xs">Escreva seu script aqui</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        console.log('Open teleprompter button clicked');
-                                        if (window.electronAPI) {
-                                            window.electronAPI.openTeleprompter();
-                                        } else {
-                                            console.error('electronAPI not available');
-                                        }
-                                    }}
-                                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/30 cursor-pointer"
-                                >
-                                    Abrir Janela
-                                </button>
-                            </div>
-                            <textarea
-                                className="w-full bg-slate-900/80 border-2 border-slate-700 rounded-xl p-4 text-white h-48 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all outline-none resize-none font-sans text-sm leading-relaxed placeholder:text-slate-500"
-                                placeholder="Digite seu script aqui... O texto aparecerá no teleprompter em tempo real."
-                                defaultValue=""
-                                onInput={(e) => {
-                                    const text = (e.target as HTMLTextAreaElement).value;
-                                    console.log('Setting teleprompter text (length):', text.length);
-                                    if (window.electronAPI) {
-                                        window.electronAPI.setTeleprompterText(text);
-                                    } else {
-                                        console.error('electronAPI not available');
-                                    }
-                                }}
-                                onChange={(e) => {
-                                    const text = e.target.value;
-                                    console.log('Setting teleprompter text (onChange):', text.length);
-                                    if (window.electronAPI) {
-                                        window.electronAPI.setTeleprompterText(text);
-                                    } else {
-                                        console.error('electronAPI not available');
-                                    }
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Settings Sidebar */}
-                    <div className="xl:col-span-1">
-                        <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-6 sticky top-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="p-2.5 bg-purple-500/20 rounded-xl">
-                                    <Settings className="w-5 h-5 text-purple-400" />
-                                </div>
-                                <h2 className="text-xl font-bold text-white">Configurações</h2>
-                            </div>
-
-                            <div className="space-y-6">
-                                {/* Camera Shape */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                                        <Circle className="w-4 h-4" />
-                                        Formato da Câmera
-                                    </label>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {['circle', 'square', 'rounded'].map((shape) => (
-                                            <button
-                                                key={shape}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    console.log('Setting camera shape to:', shape);
-                                                    if (window.electronAPI) {
-                                                        window.electronAPI.setCameraShape(shape);
-                                                    } else {
-                                                        console.error('electronAPI not available');
-                                                    }
-                                                }}
-                                                className={`p-3.5 bg-slate-900/80 border-2 rounded-xl transition-all text-sm font-medium capitalize cursor-pointer text-left ${
-                                                    cameraShape === shape
-                                                        ? 'border-blue-500 bg-blue-500/10 text-blue-300'
-                                                        : 'border-slate-700 hover:border-slate-600 hover:bg-slate-800 text-slate-300'
-                                                }`}
-                                            >
-                                                {shape === 'circle' ? 'Círculo' : shape === 'square' ? 'Quadrado' : 'Arredondado'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Camera Size */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                                        <Settings className="w-4 h-4" />
-                                        Tamanho da Câmera
-                                    </label>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {['small', 'medium', 'large'].map((size) => (
-                                            <button
-                                                key={size}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    console.log('Setting camera size to:', size);
-                                                    if (window.electronAPI) {
-                                                        window.electronAPI.setCameraSize(size);
-                                                    } else {
-                                                        console.error('electronAPI not available');
-                                                    }
-                                                }}
-                                                className="p-3.5 bg-slate-900/80 border-2 border-slate-700 rounded-xl hover:border-slate-600 hover:bg-slate-800 transition-all text-sm font-medium capitalize cursor-pointer text-left text-slate-300"
-                                            >
-                                                {size === 'small' ? 'Pequeno' : size === 'medium' ? 'Médio' : 'Grande'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Camera Visibility Toggle */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                                        <Video className="w-4 h-4" />
-                                        Visibilidade da Câmera
-                                    </label>
-                                    <button
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const newVisibility = !cameraVisible;
-                                            setCameraVisible(newVisibility);
-                                            console.log('Setting camera visibility to:', newVisibility);
-                                            if (window.electronAPI) {
-                                                if (newVisibility) {
-                                                    window.electronAPI.showCameraWindow();
-                                                } else {
-                                                    window.electronAPI.hideCameraWindow();
-                                                }
-                                            } else {
-                                                console.error('electronAPI not available');
-                                            }
-                                        }}
-                                        className={`w-full p-3.5 bg-slate-900/80 border-2 rounded-xl transition-all text-sm font-medium cursor-pointer text-left ${
-                                            cameraVisible
-                                                ? 'border-green-500 bg-green-500/10 text-green-300'
-                                                : 'border-slate-700 hover:border-slate-600 hover:bg-slate-800 text-slate-300'
-                                        }`}
-                                    >
-                                        {cameraVisible ? '✓ Câmera Visível' : '✗ Câmera Ocultada'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+        <div className="mx-auto max-w-7xl px-6 py-8">
+          <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg shadow-blue-500/30">
+                <Video className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="bg-gradient-to-r from-white via-blue-100 to-blue-300 bg-clip-text text-4xl font-bold text-transparent">
+                  Studio Recorder
+                </h1>
+                <p className="mt-1 text-sm text-slate-400">Gravação de tela com câmera, preview e teleprompter.</p>
+              </div>
             </div>
+
+            <button
+              onClick={() => window.electronAPI.showMiniPanel()}
+              className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600"
+            >
+              <Minimize2 className="h-5 w-5" />
+              Mini Painel
+            </button>
+          </header>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <section className="space-y-6 xl:col-span-2">
+              {(errorMessage || statusMessage) && (
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-sm ${
+                    errorMessage
+                      ? 'border-rose-500/40 bg-rose-500/10 text-rose-100'
+                      : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  }`}
+                >
+                  {errorMessage ?? statusMessage}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="mb-8 flex items-center gap-3">
+                  <div className="rounded-xl bg-blue-500/20 p-2.5">
+                    <Monitor className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Gravação</h2>
+                    <p className="text-sm text-slate-400">Selecione a tela, ajuste a câmera e inicie quando estiver pronto.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="mb-3 block text-sm font-semibold text-slate-300">Fonte de gravação</label>
+                    <div className="relative">
+                      <select
+                        className="w-full appearance-none rounded-xl border-2 border-slate-700 bg-slate-900/80 p-4 pr-12 text-base text-white outline-none transition-all hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        value={selectedSourceId}
+                        onChange={(event) => setSelectedSourceId(event.target.value)}
+                      >
+                        {sources.length === 0 ? (
+                          <option value="">Carregando fontes...</option>
+                        ) : (
+                          sources.map((source) => (
+                            <option key={source.id} value={source.id} className="bg-slate-800">
+                              {source.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                        <MousePointer2 className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-3 block text-sm font-semibold text-slate-300">Formato de exportação</label>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map((format) => (
+                        <button
+                          key={format}
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => setVideoFormat(format)}
+                          className={`rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                            videoFormat === format
+                              ? 'border-blue-500 bg-blue-500/10 text-blue-200'
+                              : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="font-semibold">
+                            {format === 'webm-vp9' && 'WebM (VP9)'}
+                            {format === 'webm-vp8' && 'WebM (VP8)'}
+                            {format === 'mp4' && 'MP4 (H.264)'}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">{getFormatHelperText(format)}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">Extensão final: .{resolveSaveExtension(videoFormat)}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-50">
+                    <p className="font-semibold">Áudio no macOS</p>
+                    <p className="mt-1 text-amber-100/90">{audioNotice}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => window.electronAPI.openTeleprompterControl()}
+                      className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
+                    >
+                      <Type className="h-4 w-4" />
+                      Teleprompter
+                    </button>
+
+                    <button
+                      onClick={toggleCameraVisibility}
+                      className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
+                        cameraVisible
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          : 'bg-slate-700 text-slate-100 hover:bg-slate-600'
+                      }`}
+                    >
+                      {cameraVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      {cameraVisible ? 'Ocultar câmera' : 'Mostrar câmera'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <aside className="space-y-6">
+              <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-6 shadow-2xl backdrop-blur-xl">
+                <h3 className="mb-4 text-lg font-semibold text-white">Overlay da câmera</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Formato</p>
+                    <div className="flex gap-2">
+                      {(['circle', 'rounded', 'square'] as CameraShape[]).map((shape) => (
+                        <button
+                          key={shape}
+                          onClick={() => handleCameraShape(shape)}
+                          className={`flex-1 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
+                            cameraShape === shape
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {shape === 'circle' && <Circle className="mx-auto h-4 w-4" />}
+                          {shape === 'rounded' && <span>Arred.</span>}
+                          {shape === 'square' && <span>Quadr.</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Tamanho</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['small', 'medium', 'large'] as CameraSize[]).map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => handleCameraSize(size)}
+                          className={`rounded-xl px-3 py-3 text-sm font-semibold uppercase transition-colors ${
+                            cameraSize === size
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {size === 'small' ? 'P' : size === 'medium' ? 'M' : 'G'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-6 shadow-2xl backdrop-blur-xl">
+                <h3 className="mb-2 text-lg font-semibold text-white">Status</h3>
+                <p className="text-sm text-slate-400">
+                  {phase === 'recording' && 'Gravando agora. Use o mini painel ou este painel para parar.'}
+                  {phase === 'preview' && 'Preview pronto. Revise o vídeo antes de salvar.'}
+                  {phase === 'saving' && 'Salvando arquivo no formato escolhido.'}
+                  {(phase === 'idle' || phase === 'error') && 'Pronto para uma nova gravação.'}
+                </p>
+
+                <button
+                  onClick={() => {
+                    if (isRecording) {
+                      stopRecording();
+                      return;
+                    }
+                    void startRecording();
+                  }}
+                  className={`mt-6 flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-base font-semibold transition-all ${
+                    isRecording
+                      ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white hover:from-rose-700 hover:to-rose-800'
+                      : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                  }`}
+                >
+                  <Video className="h-5 w-5" />
+                  {isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+                </button>
+              </div>
+            </aside>
+          </div>
         </div>
-        </>
-    );
+      </div>
+    </>
+  );
 };
 
 export default ControlPanel;

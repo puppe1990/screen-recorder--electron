@@ -1,47 +1,33 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause, Download, X, Video, Rewind, FastForward, Volume2, VolumeX, Gauge } from 'lucide-react';
-
-type VideoFormat = 'webm-vp9' | 'webm-vp8' | 'mp4' | 'webm';
+import type { VideoFormat } from '../../electron/ipc-contract';
 
 interface PreviewPlayerProps {
     videoBlob: Blob;
-    onSave: (format: VideoFormat) => void;
+    onSave: (format: VideoFormat) => Promise<void>;
     onCancel: () => void;
+    isSaving: boolean;
+    saveError?: string | null;
 }
 
-const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
+const PreviewPlayer = ({ videoBlob, onSave, onCancel, isSaving, saveError }: PreviewPlayerProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const isResolvingDurationRef = useRef(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState<VideoFormat>('webm-vp9');
-    const [videoUrl, setVideoUrl] = useState<string>('');
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [volume, setVolume] = useState(0.8);
     const [isMuted, setIsMuted] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [resolution, setResolution] = useState('');
+    const videoUrl = useMemo(() => URL.createObjectURL(videoBlob), [videoBlob]);
 
     useEffect(() => {
-        const url = URL.createObjectURL(videoBlob);
-        setVideoUrl(url);
-        setIsPlaying(false);
-        setDuration(0);
-        setCurrentTime(0);
-        setPlaybackRate(1);
-        setIsMuted(false);
-        setVolume(0.8);
-        isResolvingDurationRef.current = false;
-        if (videoRef.current) {
-            videoRef.current.currentTime = 0;
-            videoRef.current.pause();
-            videoRef.current.playbackRate = 1;
-        }
-
         return () => {
-            URL.revokeObjectURL(url);
+            URL.revokeObjectURL(videoUrl);
         };
-    }, [videoBlob]);
+    }, [videoUrl]);
 
     useEffect(() => {
         if (videoRef.current) {
@@ -107,11 +93,11 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
         setIsPlaying(false);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (videoRef.current) {
             videoRef.current.pause();
         }
-        onSave(selectedFormat);
+        await onSave(selectedFormat);
     };
 
     const handleTimeUpdate = () => {
@@ -374,27 +360,35 @@ const PreviewPlayer = ({ videoBlob, onSave, onCancel }: PreviewPlayerProps) => {
                                         <div className="text-xs text-slate-400">
                                             {format === 'webm-vp9' && 'Melhor qualidade'}
                                             {format === 'webm-vp8' && 'Boa compatibilidade'}
-                                            {format === 'mp4' && 'Formato universal'}
+                                            {format === 'mp4' && 'Converte WebM para MP4'}
                                         </div>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
+                        {saveError && (
+                            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                                {saveError}
+                            </div>
+                        )}
+
                         {/* Action Buttons */}
                         <div className="flex items-center justify-end gap-3">
                             <button
                                 onClick={onCancel}
+                                disabled={isSaving}
                                 className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors text-white font-semibold"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl transition-colors text-white font-semibold flex items-center gap-2"
+                                disabled={isSaving}
+                                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl transition-colors text-white font-semibold flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <Download className="w-5 h-5" />
-                                Salvar Vídeo
+                                {isSaving ? 'Salvando...' : 'Salvar Vídeo'}
                             </button>
                         </div>
                     </div>

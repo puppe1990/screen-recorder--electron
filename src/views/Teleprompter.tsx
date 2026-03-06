@@ -1,22 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Gauge, Pause, Play, Square, X } from 'lucide-react';
 
 const DEFAULT_TELEPROMPTER_TEXT = 'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
-const BASE_SCROLL_DURATION = 20; // seconds at 1x speed
-const MIN_SCROLL_DURATION = 6; // avoid absurd speeds
+const BASE_WPM = 130; // baseline reading speed
+const MIN_SCROLL_SECONDS = 10;
+const MAX_SCROLL_SECONDS = 600;
 
 const Teleprompter = () => {
   const [text, setText] = useState(DEFAULT_TELEPROMPTER_TEXT);
   const [isRunning, setIsRunning] = useState(true);
-  const [scrollCycle, setScrollCycle] = useState(0);
   const [speed, setSpeed] = useState(1);
-  const effectiveDuration = Math.max(MIN_SCROLL_DURATION, BASE_SCROLL_DURATION / speed);
+  const [offset, setOffset] = useState(0);
+  const [viewportVersion, setViewportVersion] = useState(0);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const offsetRef = useRef(0);
+  const frameRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  const setOffsetValue = (value: number) => {
+    offsetRef.current = value;
+    setOffset(value);
+  };
+  const duration = useMemo(() => {
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    const secondsForWords = words > 0 ? (words / BASE_WPM) * 60 : 30;
+    return Math.min(Math.max(secondsForWords / speed, MIN_SCROLL_SECONDS), MAX_SCROLL_SECONDS);
+  }, [text, speed]);
 
   useEffect(() => {
     let isMounted = true;
     const handleTextChange = (newText: string) => {
       if (!isMounted) return;
       setText(newText);
+      setOffsetValue(0);
+      startRef.current = null;
     };
 
     const syncInitialText = async () => {
@@ -25,6 +43,8 @@ const Teleprompter = () => {
         const savedText = await window.electronAPI.getTeleprompterText();
         if (isMounted && typeof savedText === 'string') {
           setText(savedText ?? DEFAULT_TELEPROMPTER_TEXT);
+          setOffsetValue(0);
+          startRef.current = null;
         }
       } catch (error) {
         console.error('Failed to load teleprompter text:', error);
@@ -40,10 +60,7 @@ const Teleprompter = () => {
     // Add keyboard shortcut to close (ESC key)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        console.log('ESC key pressed, closing teleprompter');
-        if (window.electronAPI) {
-          window.electronAPI.closeTeleprompter();
-        }
+        window.electronAPI?.closeTeleprompter();
       }
     };
 
@@ -65,19 +82,82 @@ const Teleprompter = () => {
 
   const handleStop = () => {
     setIsRunning(false);
-    setScrollCycle((cycle) => cycle + 1); // reset posição
+    setOffsetValue(0); // reset posição
+    startRef.current = null;
   };
+
+  // Observa redimensionamento do container para recalcular distância de rolagem
+  useEffect(() => {
+    const target = viewportRef.current;
+    if (!target) return;
+
+    const observer = new ResizeObserver(() => {
+      setViewportVersion((v) => v + 1);
+    });
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Anima a rolagem com base em pixels para evitar saltos de velocidade em textos longos/curtos
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    const viewportHeight = viewport.clientHeight;
+    const contentHeight = content.scrollHeight;
+    const distance = Math.max(0, contentHeight - viewportHeight);
+
+    if (distance === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOffsetValue(0);
+      return;
+    }
+
+    const durationMs = duration * 1000;
+
+    const animate = (timestamp: number) => {
+      if (startRef.current === null) {
+        const currentProgress = Math.min(Math.abs(offsetRef.current) / distance, 1);
+        startRef.current = timestamp - currentProgress * durationMs;
+      }
+
+      const elapsed = timestamp - startRef.current;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const newOffset = -distance * progress;
+
+      if (newOffset !== offsetRef.current) {
+        setOffsetValue(newOffset);
+      }
+
+      if (progress >= 1) {
+        setOffsetValue(0); // volta ao topo
+        startRef.current = timestamp; // reinicia ciclo
+      }
+
+      frameRef.current = requestAnimationFrame(animate);
+    };
+
+    if (isRunning) {
+      frameRef.current = requestAnimationFrame(animate);
+    } else {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      startRef.current = null;
+    }
+
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      startRef.current = null;
+    };
+  }, [isRunning, duration, text, viewportVersion]);
 
   const handleClose = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Close button clicked');
-    if (window.electronAPI) {
-      console.log('Calling closeTeleprompter');
-      window.electronAPI.closeTeleprompter();
-    } else {
-      console.error('electronAPI not available');
-    }
+    window.electronAPI?.closeTeleprompter();
   };
 
   return (
@@ -105,14 +185,14 @@ const Teleprompter = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-hidden relative rounded-2xl border border-white/10 bg-black/40 px-8 py-6">
+      <div
+        ref={viewportRef}
+        className="flex-1 overflow-hidden relative rounded-2xl border border-white/10 bg-black/40 px-8 py-6"
+      >
         <div
-          key={scrollCycle}
-          className="text-3xl font-bold leading-relaxed text-center whitespace-pre-wrap no-drag"
-          style={{
-            animation: `scroll ${effectiveDuration}s linear infinite`,
-            animationPlayState: isRunning ? 'running' : 'paused',
-          }}
+          ref={contentRef}
+          className="text-3xl font-bold leading-relaxed text-center whitespace-pre-wrap no-drag will-change-transform"
+          style={{ transform: `translateY(${offset}px)` }}
         >
           {text}
         </div>
@@ -162,13 +242,6 @@ const Teleprompter = () => {
         </div>
       </div>
       <style>{`
-        @keyframes scroll {
-          0% { transform: translateY(100%); }
-          100% { transform: translateY(-100%); }
-        }
-        .animate-scroll {
-          animation: scroll 20s linear infinite;
-        }
         .drag-region {
           -webkit-app-region: drag;
         }

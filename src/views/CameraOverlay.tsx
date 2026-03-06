@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
+import type { CameraShape } from '../../electron/ipc-contract';
 
 const CameraOverlay = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [shape, setShape] = useState('circle');
+    const [shape, setShape] = useState<CameraShape>('circle');
 
     useEffect(() => {
+        const videoElement = videoRef.current;
         const startCamera = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 300, height: 300 },
                     audio: false,
                 });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
+                if (videoElement) {
+                    videoElement.srcObject = stream;
                 }
             } catch (err) {
                 console.error("Error accessing camera:", err);
@@ -23,25 +25,20 @@ const CameraOverlay = () => {
 
         // Cleanup function to stop camera stream
         return () => {
-            if (videoRef.current?.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
+            if (videoElement?.srcObject) {
+                const stream = videoElement.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
             }
         };
     }, []);
 
     useEffect(() => {
-        if (window.electronAPI) {
-            const handleShapeChange = (newShape: string) => {
-                setShape(newShape);
-            };
-            
-            // Register listener
-            window.electronAPI.onCameraShapeChange(handleShapeChange);
-            
-            // Note: In Electron with contextBridge, listeners are automatically cleaned up
-            // but we can't manually remove them. The listener will persist for the window lifetime.
-        }
+        if (!window.electronAPI) return;
+        const cleanup = window.electronAPI.onCameraShapeChange((newShape) => {
+            setShape(newShape);
+        });
+
+        return cleanup;
     }, []);
 
     const getShapeClass = () => {
