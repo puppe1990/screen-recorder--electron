@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, Menu, Tray, desktopCapturer, dialog, ipcMain, nativeImage, screen, session, systemPreferences } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -41,8 +41,10 @@ let cameraWindow: BrowserWindow | null = null;
 let teleprompterWindow: BrowserWindow | null = null;
 let miniPanelWindow: BrowserWindow | null = null;
 let teleprompterControlWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let currentRecordingState = false;
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
+let cameraStatusMessage: string | null = null;
 
 const hasWindow = (window: BrowserWindow | null): window is BrowserWindow => Boolean(window && !window.isDestroyed());
 
@@ -108,6 +110,81 @@ const isInternalSource = (name: string) => {
   const matchesTeleprompterWindow = normalizedName === 'teleprompter';
 
   return matchesControlWindow || matchesMiniPanel || matchesTeleprompterWindow;
+};
+
+const getTrayImage = () => {
+  const iconPath = path.join(process.env.VITE_PUBLIC || DIST_PATH, 'icon.png');
+  const image = nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 });
+
+  if (process.platform === 'darwin') {
+    image.setTemplateImage(true);
+  }
+
+  return image;
+};
+
+const createTray = () => {
+  if (tray) {
+    return tray;
+  }
+
+  tray = new Tray(getTrayImage());
+  tray.setToolTip('Studio Recorder');
+
+  const refreshTrayMenu = () => {
+    if (!tray) return;
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Abrir painel principal',
+        click: () => {
+          createControlWindow();
+          hideWindow(miniPanelWindow);
+        },
+      },
+      {
+        label: 'Mostrar mini painel',
+        click: () => {
+          createMiniPanelWindow();
+          showWindow(miniPanelWindow);
+        },
+      },
+      {
+        label: hasWindow(cameraWindow) && cameraWindow.isVisible() ? 'Ocultar camera' : 'Mostrar camera',
+        click: () => {
+          if (!hasWindow(cameraWindow)) {
+            createCameraWindow();
+            return;
+          }
+
+          if (cameraWindow.isVisible()) {
+            hideWindow(cameraWindow);
+            return;
+          }
+
+          showWindow(cameraWindow, false);
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Sair',
+        click: () => {
+          app.quit();
+        },
+      },
+    ]);
+
+    tray.setContextMenu(contextMenu);
+  };
+
+  tray.on('click', () => {
+    createControlWindow();
+    hideWindow(miniPanelWindow);
+    refreshTrayMenu();
+  });
+
+  refreshTrayMenu();
+  return tray;
 };
 
 function createControlWindow(options?: { show?: boolean }) {
@@ -222,12 +299,55 @@ function createCameraWindow() {
   cameraWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   loadRendererView(cameraWindow, 'camera');
 
+  cameraWindow.webContents.once('did-finish-load', () => {
+    sendToWindow(cameraWindow, IPC_CHANNELS.cameraStatusChanged, cameraStatusMessage);
+  });
+
   cameraWindow.on('closed', () => {
     cameraWindow = null;
   });
 
   return cameraWindow;
 }
+
+const configureMediaPermissions = async () => {
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === 'media';
+  });
+
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'media');
+  });
+
+  if (process.platform === 'darwin') {
+    const cameraGranted = await systemPreferences.askForMediaAccess('camera').catch(() => false);
+    await systemPreferences.askForMediaAccess('microphone').catch(() => false);
+
+    if (!cameraGranted) {
+      setCameraStatus('Permita acesso à câmera nas configurações do macOS para exibir o overlay.');
+      return;
+    }
+  }
+
+  setCameraStatus(null);
+};
+
+const setCameraStatus = (message: string | null) => {
+  cameraStatusMessage = message;
+  sendToWindow(cameraWindow, IPC_CHANNELS.cameraStatusChanged, message);
+};
+
+const getScreenCaptureErrorMessage = (error: unknown) => {
+  if (process.platform === 'darwin') {
+    const status = systemPreferences.getMediaAccessStatus('screen');
+
+    if (status !== 'granted') {
+      return 'Permita a Gravação de Tela em Ajustes do Sistema > Privacidade e Segurança > Gravação de Tela para o app ou terminal que está executando o Electron, depois abra o app novamente.';
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
+};
 
 function createTeleprompterWindow() {
   if (hasWindow(teleprompterWindow)) {
@@ -305,27 +425,32 @@ const listCaptureSources = async (): Promise<DesktopSource[]> => {
     ].filter((value): value is string => Boolean(value))
   );
 
-  const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
+  try {
+    const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
 
-  return sources
-    .filter((source) => {
-      if (excludedIds.has(source.id)) {
-        return false;
-      }
+    return sources
+      .filter((source) => {
+        if (excludedIds.has(source.id)) {
+          return false;
+        }
 
-      return !isInternalSource(source.name);
-    })
-    .sort((left, right) => {
-      const leftIsScreen = left.id.startsWith('screen:');
-      const rightIsScreen = right.id.startsWith('screen:');
-      if (leftIsScreen === rightIsScreen) return 0;
-      return leftIsScreen ? -1 : 1;
-    })
-    .map((source) => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL(),
-    }));
+        return !isInternalSource(source.name);
+      })
+      .sort((left, right) => {
+        const leftIsScreen = left.id.startsWith('screen:');
+        const rightIsScreen = right.id.startsWith('screen:');
+        if (leftIsScreen === rightIsScreen) return 0;
+        return leftIsScreen ? -1 : 1;
+      })
+      .map((source) => ({
+        id: source.id,
+        name: source.name,
+        thumbnail: source.thumbnail.toDataURL(),
+      }));
+  } catch (error) {
+    console.error('Failed to list capture sources:', error);
+    throw new Error(getScreenCaptureErrorMessage(error));
+  }
 };
 
 const persistRecording = async (request: SaveRecordingRequest): Promise<SaveRecordingResult> => {
@@ -489,8 +614,11 @@ app.on('window-all-closed', () => {
 });
 
 app.whenReady().then(() => {
+  void configureMediaPermissions();
+  createTray();
   createMiniPanelWindow();
   createCameraWindow();
+  createControlWindow({ show: false });
   registerIpcHandlers();
 
   app.on('activate', () => {

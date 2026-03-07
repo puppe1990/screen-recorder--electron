@@ -36,6 +36,7 @@ export const createElectronApi = (
   getSources: () => ipc.invoke(IPC_CHANNELS.getSources),
   setCameraShape: (shape: CameraShape) => ipc.send(IPC_CHANNELS.setCameraShape, shape),
   onCameraShapeChange: (callback) => subscribe(ipc, IPC_CHANNELS.cameraShapeChanged, callback),
+  onCameraStatusChange: (callback) => subscribe(ipc, IPC_CHANNELS.cameraStatusChanged, callback),
   setTeleprompterText: (text) => ipc.send(IPC_CHANNELS.setTeleprompterText, text),
   onTeleprompterTextChange: (callback) => subscribe(ipc, IPC_CHANNELS.teleprompterTextChanged, callback),
   getTeleprompterText: () => ipc.invoke(IPC_CHANNELS.getTeleprompterText),

@@ -4,6 +4,7 @@ export const IPC_CHANNELS = {
   getTeleprompterText: 'get-teleprompter-text',
   setCameraShape: 'set-camera-shape',
   cameraShapeChanged: 'camera-shape-changed',
+  cameraStatusChanged: 'camera-status-changed',
   setCameraSize: 'set-camera-size',
   setTeleprompterText: 'set-teleprompter-text',
   teleprompterTextChanged: 'teleprompter-text-changed',
@@ -62,6 +63,7 @@ export interface ElectronAPI {
   getSources: () => Promise<DesktopSource[]>;
   setCameraShape: (shape: CameraShape) => void;
   onCameraShapeChange: (callback: (shape: CameraShape) => void) => CleanupFn;
+  onCameraStatusChange: (callback: (message: string | null) => void) => CleanupFn;
   setTeleprompterText: (text: string) => void;
   onTeleprompterTextChange: (callback: (text: string) => void) => CleanupFn;
   getTeleprompterText: () => Promise<string>;

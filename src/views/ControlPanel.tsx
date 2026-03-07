@@ -144,24 +144,42 @@ const ControlPanel = () => {
   const isRecording = phase === 'recording';
   const isSaving = phase === 'saving';
 
-  useEffect(() => {
-    const loadSources = async () => {
-      try {
-        const nextSources = await window.electronAPI.getSources();
-        setSources(nextSources);
-        if (nextSources.length > 0) {
-          const preferredSource = nextSources.find((source) => source.id.startsWith('screen:')) ?? nextSources[0];
-          setSelectedSourceId(preferredSource.id);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
-        setPhase('error');
-        setErrorMessage(message);
-      }
-    };
+  const loadSources = useCallback(async () => {
+    try {
+      const nextSources = await window.electronAPI.getSources();
+      setSources(nextSources);
+      setErrorMessage(null);
 
-    void loadSources();
+      if (nextSources.length > 0) {
+        const preferredSource = nextSources.find((source) => source.id.startsWith('screen:')) ?? nextSources[0];
+        setSelectedSourceId(preferredSource.id);
+        setPhase((currentPhase) => (currentPhase === 'error' ? 'idle' : currentPhase));
+        return;
+      }
+
+      setSelectedSourceId('');
+      setPhase('error');
+      setErrorMessage('Nenhuma fonte de gravação está disponível no momento.');
+      window.electronAPI.showControlWindow();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
+      setSources([]);
+      setSelectedSourceId('');
+      setPhase('error');
+      setErrorMessage(message);
+      window.electronAPI.showControlWindow();
+    }
   }, []);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void loadSources();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [loadSources]);
 
   useEffect(() => {
     const cleanupShape = window.electronAPI.onCameraShapeChange((shape) => {
@@ -204,7 +222,12 @@ const ControlPanel = () => {
   const startRecording = useCallback(async () => {
     if (!selectedSourceId) {
       setPhase('error');
-      setErrorMessage('Selecione uma fonte de gravação antes de iniciar.');
+      setErrorMessage(
+        sources.length === 0
+          ? 'Nenhuma fonte de gravação está disponível. Atualize a lista e confirme as permissões do sistema.'
+          : 'Selecione uma fonte de gravação antes de iniciar.'
+      );
+      window.electronAPI.showControlWindow();
       return;
     }
 
@@ -284,7 +307,7 @@ const ControlPanel = () => {
       setErrorMessage(message);
       window.electronAPI.showControlWindow();
     }
-  }, [selectedSourceId, videoFormat]);
+  }, [selectedSourceId, sources.length, videoFormat]);
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -415,7 +438,7 @@ const ControlPanel = () => {
                         onChange={(event) => setSelectedSourceId(event.target.value)}
                       >
                         {sources.length === 0 ? (
-                          <option value="">Carregando fontes...</option>
+                          <option value="">{errorMessage ? 'Nenhuma fonte disponível' : 'Carregando fontes...'}</option>
                         ) : (
                           sources.map((source) => (
                             <option key={source.id} value={source.id} className="bg-slate-800">
@@ -427,6 +450,16 @@ const ControlPanel = () => {
                       <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
                         <MousePointer2 className="h-5 w-5" />
                       </div>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void loadSources()}
+                        disabled={isRecording || isSaving}
+                        className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Atualizar fontes
+                      </button>
                     </div>
                   </div>
 

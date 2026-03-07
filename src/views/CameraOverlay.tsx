@@ -4,6 +4,7 @@ import type { CameraShape } from '../../electron/ipc-contract';
 const CameraOverlay = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [shape, setShape] = useState<CameraShape>('circle');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const videoElement = videoRef.current;
@@ -16,8 +17,10 @@ const CameraOverlay = () => {
                 if (videoElement) {
                     videoElement.srcObject = stream;
                 }
+                setErrorMessage(null);
             } catch (err) {
-                console.error("Error accessing camera:", err);
+                const message = err instanceof Error ? err.message : 'Não foi possível abrir a câmera.';
+                setErrorMessage(message);
             }
         };
 
@@ -37,8 +40,14 @@ const CameraOverlay = () => {
         const cleanup = window.electronAPI.onCameraShapeChange((newShape) => {
             setShape(newShape);
         });
+        const cleanupStatus = window.electronAPI.onCameraStatusChange((message) => {
+            setErrorMessage(message);
+        });
 
-        return cleanup;
+        return () => {
+            cleanup();
+            cleanupStatus();
+        };
     }, []);
 
     const getShapeClass = () => {
@@ -52,12 +61,18 @@ const CameraOverlay = () => {
 
     return (
         <div className={`w-full h-full flex items-center justify-center overflow-hidden border-4 border-blue-500 bg-black drag-region ${getShapeClass()}`}>
-            <video
-                ref={videoRef}
-                autoPlay
-                muted
-                className="w-full h-full object-cover transform scale-x-[-1]"
-            />
+            {errorMessage ? (
+                <div className="flex h-full w-full items-center justify-center bg-slate-950/95 px-6 text-center text-sm text-rose-200">
+                    {errorMessage}
+                </div>
+            ) : (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    className="w-full h-full object-cover transform scale-x-[-1]"
+                />
+            )}
             <style>{`
         .drag-region {
           -webkit-app-region: drag;
