@@ -14,7 +14,7 @@ import {
   type SaveRecordingRequest,
   type SaveRecordingResult,
   type VideoFormat,
-} from './ipc-contract';
+} from './ipc-contract.js';
 
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
@@ -34,6 +34,7 @@ const preloadPath = path.join(__dirname, 'preload.js');
 
 const DEFAULT_TELEPROMPTER_TEXT =
   'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
+const INTERNAL_WINDOW_TITLES = ['studio recorder', 'teleprompter control'];
 
 let controlWindow: BrowserWindow | null = null;
 let cameraWindow: BrowserWindow | null = null;
@@ -99,6 +100,15 @@ const saveFailure = (
   code,
   message,
 });
+
+const isInternalSource = (name: string) => {
+  const normalizedName = name.toLowerCase();
+  const matchesControlWindow = INTERNAL_WINDOW_TITLES.some((title) => normalizedName.includes(title));
+  const matchesMiniPanel = normalizedName.includes('mini panel') || normalizedName.includes('mini painel');
+  const matchesTeleprompterWindow = normalizedName === 'teleprompter';
+
+  return matchesControlWindow || matchesMiniPanel || matchesTeleprompterWindow;
+};
 
 function createControlWindow(options?: { show?: boolean }) {
   const shouldShow = options?.show ?? true;
@@ -303,13 +313,7 @@ const listCaptureSources = async (): Promise<DesktopSource[]> => {
         return false;
       }
 
-      const name = source.name.toLowerCase();
-      const isControlWindow =
-        (name.includes('screen-recorder-electron') || name.includes('studio recorder')) &&
-        !name.includes('camera') &&
-        !name.includes('teleprompter');
-
-      return !isControlWindow && !name.includes('teleprompter control') && !name.includes('mini panel') && !name.includes('mini painel') && !name.includes('teleprompter');
+      return !isInternalSource(source.name);
     })
     .sort((left, right) => {
       const leftIsScreen = left.id.startsWith('screen:');
@@ -350,16 +354,18 @@ const persistRecording = async (request: SaveRecordingRequest): Promise<SaveReco
       const tempWebmPath = path.join(app.getPath('temp'), `temp-recording-${Date.now()}.webm`);
       await writeFile(tempWebmPath, Buffer.from(request.buffer));
 
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg(tempWebmPath)
-          .outputOptions(['-c:v libx264', '-preset fast', '-crf 23', '-c:a aac', '-b:a 128k', '-movflags +faststart'])
-          .output(targetFilePath)
-          .on('end', resolve)
-          .on('error', reject)
-          .run();
-      });
-
-      void unlink(tempWebmPath).catch(() => undefined);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg(tempWebmPath)
+            .outputOptions(['-c:v libx264', '-preset fast', '-crf 23', '-c:a aac', '-b:a 128k', '-movflags +faststart'])
+            .output(targetFilePath)
+            .on('end', () => resolve())
+            .on('error', reject)
+            .run();
+        });
+      } finally {
+        void unlink(tempWebmPath).catch(() => undefined);
+      }
     } else {
       await writeFile(targetFilePath, Buffer.from(request.buffer));
     }
