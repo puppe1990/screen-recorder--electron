@@ -6,7 +6,7 @@ import {
   type CleanupFn,
   type ElectronAPI,
   type SaveRecordingRequest,
-} from './ipc-contract';
+} from './ipc-contract.js';
 
 type EventCallback<T> = (value: T) => void;
 
