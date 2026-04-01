@@ -56,7 +56,7 @@ let tray: Tray | null = null;
 let currentRecordingState = false;
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
 let cameraStatusMessage: string | null = null;
-const MINI_PANEL_COLLAPSED = { width: 460, height: 148 };
+const MINI_PANEL_COLLAPSED = { width: 680, height: 100 };
 const MINI_PANEL_EXPANDED = { width: 960, height: 620 };
 
 const hasWindow = (window: BrowserWindow | null): window is BrowserWindow =>

@@ -94,7 +94,7 @@ const CameraOverlay = () => {
 
   return (
     <div
-      className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-transparent drag-region ring-2 ring-cyan-400/60 shadow-[0_0_24px_rgba(110,231,249,0.45),0_18px_48px_rgba(0,0,0,0.38)] ${getShapeClass()}`}
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-transparent drag-region ring-2 ring-cyan-400/60 shadow-[0_0_24px_rgba(110,231,249,0.45)] ${getShapeClass()}`}
     >
       {isLoading && !visibleMessage && (
         <div className="flex h-full w-full items-center justify-center">
@@ -129,7 +129,7 @@ const CameraOverlay = () => {
             muted
             playsInline
             aria-label="Feed da câmera (imagem espelhada)"
-            className="h-full w-full object-cover transform scale-x-[-1]"
+            className="block h-full w-full object-cover transform scale-x-[-1]"
           />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.00),rgba(0,0,0,0.08)_65%,rgba(0,0,0,0.26))]" />
         </>

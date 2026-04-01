@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import {
   Play,
   Pause,
@@ -9,7 +16,6 @@ import {
   FastForward,
   Volume2,
   VolumeX,
-  Gauge,
 } from 'lucide-react';
 import type { VideoFormat } from '../../electron/ipc-contract';
 
@@ -34,442 +40,300 @@ const PreviewPlayer = ({
   const [selectedFormat, setSelectedFormat] = useState<VideoFormat>('webm-vp9');
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [resolution, setResolution] = useState('');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const videoUrl = useMemo(() => URL.createObjectURL(videoBlob), [videoBlob]);
 
   useEffect(() => {
-    return () => {
-      URL.revokeObjectURL(videoUrl);
-    };
+    return () => URL.revokeObjectURL(videoUrl);
   }, [videoUrl]);
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = isMuted;
-      videoRef.current.volume = isMuted ? 0 : volume;
     }
-  }, [volume, isMuted]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = playbackRate;
-    }
-  }, [playbackRate]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSaving) {
-        setShowDiscardConfirm(true);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSaving]);
+  }, [isMuted]);
 
   const formatTime = (seconds: number) => {
     if (!Number.isFinite(seconds)) return '00:00';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const resolveVideoDuration = () => {
     if (!videoRef.current) return;
-
     const video = videoRef.current;
-    const validDuration = (value: number) =>
-      Number.isFinite(value) && value > 0 && value !== Infinity;
+    const valid = (v: number) => Number.isFinite(v) && v > 0 && v !== Infinity;
 
-    if (validDuration(video.duration)) {
+    if (valid(video.duration)) {
       setDuration(video.duration);
       return;
     }
 
     isResolvingDurationRef.current = true;
-
-    const handleDurationFix = () => {
+    const fix = () => {
       if (!videoRef.current) return;
-
-      const fixedDuration = videoRef.current.duration;
-      if (!validDuration(fixedDuration)) return;
-
-      videoRef.current.removeEventListener('timeupdate', handleDurationFix);
+      const d = videoRef.current.duration;
+      if (!valid(d)) return;
+      videoRef.current.removeEventListener('timeupdate', fix);
       videoRef.current.currentTime = 0;
       setCurrentTime(0);
-      setDuration(fixedDuration);
+      setDuration(d);
       isResolvingDurationRef.current = false;
     };
-
-    video.addEventListener('timeupdate', handleDurationFix);
-    video.currentTime = 1000000000;
+    video.addEventListener('timeupdate', fix);
+    video.currentTime = 1e9;
   };
 
   const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-    }
+    if (!videoRef.current) return;
+    if (isPlaying) videoRef.current.pause();
+    else void videoRef.current.play();
   };
 
-  const handleVideoEnd = () => {
-    setIsPlaying(false);
-  };
-
-  const handleCancel = () => {
+  const handleGlobalKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (isSaving) return;
-    setShowDiscardConfirm(true);
-  };
 
-  const handleSave = async () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
+    if (event.key === 'Escape') {
+      setShowDiscardConfirm(true);
+      return;
     }
-    await onSave(selectedFormat);
-  };
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current && !isResolvingDurationRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+    if (event.key === ' ' && !showDiscardConfirm) {
+      event.preventDefault();
+      handlePlayPause();
     }
-  };
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleGlobalKeyDown(event);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleSeek = (value: number) => {
     if (!videoRef.current) return;
-    const safeTime = Math.min(
-      Math.max(value, 0),
-      videoRef.current.duration || 0
-    );
-    videoRef.current.currentTime = safeTime;
-    setCurrentTime(safeTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!videoRef.current) return;
-    setResolution(
-      `${videoRef.current.videoWidth} x ${videoRef.current.videoHeight}`
-    );
-    resolveVideoDuration();
+    const t = Math.min(Math.max(value, 0), videoRef.current.duration || 0);
+    videoRef.current.currentTime = t;
+    setCurrentTime(t);
   };
 
   const handleSkip = (amount: number) => {
-    if (!videoRef.current) return;
-    handleSeek(videoRef.current.currentTime + amount);
+    if (videoRef.current) handleSeek(videoRef.current.currentTime + amount);
   };
 
-  const handleToggleMute = () => {
-    setIsMuted((mute) => !mute);
-  };
-
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-    if (value > 0) {
-      setIsMuted(false);
-    }
-  };
-
-  const handleRateChange = (rate: number) => {
-    setPlaybackRate(rate);
+  const handleSave = async () => {
+    videoRef.current?.pause();
+    await onSave(selectedFormat);
   };
 
   const sizeLabel = () => {
-    const sizeInMB = videoBlob.size / (1024 * 1024);
-    if (sizeInMB > 1024) {
-      return `${(sizeInMB / 1024).toFixed(2)} GB`;
-    }
-    return `${sizeInMB.toFixed(1)} MB`;
+    const mb = videoBlob.size / (1024 * 1024);
+    return mb > 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
   };
 
   const progressPercent = duration
     ? Math.min((currentTime / duration) * 100, 100)
     : 0;
-  const playbackRates = [0.75, 1, 1.25, 1.5, 2];
-  const controlChipClass =
-    'rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]';
+
+  const formatLabel = (f: VideoFormat) =>
+    f === 'webm-vp9' ? 'VP9' : f === 'webm-vp8' ? 'VP8' : 'MP4';
 
   return (
-    <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-[rgba(3,5,7,0.88)] p-6 backdrop-blur-md"
-      style={{ scrollBehavior: 'smooth' }}
-    >
-      <div className="min-h-full flex items-center justify-center py-6">
-        <div className="w-full max-w-6xl rounded-[30px] border border-white/8 bg-[linear-gradient(160deg,rgba(12,15,20,0.98),rgba(8,10,15,0.98))] shadow-[0_30px_120px_rgba(0,0,0,0.52)]">
-          <div className="flex items-center justify-between border-b border-white/8 p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2">
-                <Video className="h-6 w-6 text-cyan-200" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-semibold tracking-[-0.02em] text-white">
-                  Preview da Gravação
-                </h2>
-                <p className="text-slate-400 text-sm">
-                  Revise o vídeo antes de salvar
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleCancel}
-              className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-slate-300 transition duration-200 hover:bg-white/[0.08]"
-              title="Fechar preview (ESC)"
-              aria-label="Fechar preview"
-            >
-              <X className="w-5 h-5 text-slate-400" />
-            </button>
+    <div className="fixed inset-0 z-50 flex flex-col bg-[linear-gradient(160deg,rgba(10,12,17,0.99),rgba(6,8,12,0.99))]">
+      {/* Header */}
+      <div
+        className="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-2.5"
+        style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-[12px] border border-cyan-300/20 bg-cyan-300/10 p-1.5">
+            <Video className="h-4 w-4 text-cyan-200" />
           </div>
+          <span className="text-sm font-semibold text-white">
+            Preview da Gravação
+          </span>
+          {resolution && (
+            <span className="text-xs text-slate-500">{resolution}</span>
+          )}
+          <span className="text-xs text-slate-500">{sizeLabel()}</span>
+          {duration > 0 && (
+            <span className="text-xs text-slate-500">
+              {formatTime(duration)}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => !isSaving && setShowDiscardConfirm(true)}
+          style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+          className="rounded-full border border-white/10 bg-white/[0.04] p-1.5 text-slate-400 transition hover:bg-white/[0.08]"
+          title="Fechar (ESC)"
+          aria-label="Fechar preview"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr),320px]">
-            <div className="space-y-5">
-              <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                <div className="aspect-video flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_35%),#020304]">
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    className="h-full w-full object-contain"
-                    onEnded={handleVideoEnd}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                  />
-                </div>
-              </div>
+      {/* Video */}
+      <div className="min-h-0 flex-1 overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="h-full w-full object-contain"
+          onEnded={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onTimeUpdate={() => {
+            if (videoRef.current && !isResolvingDurationRef.current) {
+              setCurrentTime(videoRef.current.currentTime);
+            }
+          }}
+          onLoadedMetadata={() => {
+            if (!videoRef.current) return;
+            setResolution(
+              `${videoRef.current.videoWidth}×${videoRef.current.videoHeight}`
+            );
+            resolveVideoDuration();
+          }}
+        />
+      </div>
 
-              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-14 text-right font-mono text-xs text-slate-300">
-                    {formatTime(currentTime)}
-                  </span>
-                  <div className="relative flex-1">
-                    <input
-                      type="range"
-                      min={0}
-                      max={duration || 0}
-                      value={duration ? currentTime : 0}
-                      step="0.1"
-                      onChange={(e) => handleSeek(Number(e.target.value))}
-                      aria-label="Posição do vídeo"
-                      aria-valuemin={0}
-                      aria-valuemax={duration || 0}
-                      aria-valuenow={currentTime}
-                      aria-valuetext={formatTime(currentTime)}
-                      className="relative z-10 w-full bg-transparent"
-                    />
-                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 rounded-full bg-white/10" />
-                    <div
-                      className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-cyan-300"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <span className="w-14 font-mono text-xs text-slate-400">
-                    {formatTime(duration || 0)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] p-2">
-                  <button
-                    onClick={() => handleSkip(-10)}
-                    className={controlChipClass}
-                    title="Voltar 10s"
-                  >
-                    <Rewind className="w-5 h-5" />
-                    <span className="text-sm font-semibold">10s</span>
-                  </button>
-                  <button
-                    onClick={handlePlayPause}
-                    className={`rounded-[18px] px-4 py-2 text-sm font-semibold transition duration-200 ${
-                      isPlaying
-                        ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white shadow-[0_16px_30px_rgba(255,93,115,0.24)]'
-                        : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950 shadow-[0_16px_30px_rgba(110,231,249,0.22)]'
-                    }`}
-                  >
-                    {isPlaying ? (
-                      <>
-                        <Pause className="w-5 h-5 text-white" />
-                        <span className="text-white">Pausar</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-5 h-5" />
-                        <span>Reproduzir</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleSkip(10)}
-                    className={controlChipClass}
-                    title="Avançar 10s"
-                  >
-                    <span className="text-sm font-semibold">10s</span>
-                    <FastForward className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/[0.04] px-3 py-2.5">
-                  <button
-                    onClick={handleToggleMute}
-                    className="rounded-[16px] border border-white/10 bg-white/[0.04] p-2.5 text-slate-200 transition duration-200 hover:bg-white/[0.08]"
-                    title={isMuted ? 'Reativar áudio' : 'Silenciar áudio'}
-                  >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX className="w-5 h-5" />
-                    ) : (
-                      <Volume2 className="w-5 h-5" />
-                    )}
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={isMuted ? 0 : volume}
-                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                    aria-label="Volume"
-                    className="w-32"
-                  />
-                  <span className="w-10 text-right font-mono text-xs text-slate-300">
-                    {Math.round((isMuted ? 0 : volume) * 100)}%
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] px-3 py-2.5">
-                  <Gauge className="h-4 w-4 text-cyan-200" />
-                  {playbackRates.map((rate) => (
-                    <button
-                      key={rate}
-                      onClick={() => handleRateChange(rate)}
-                      className={`rounded-[16px] px-3 py-2 text-sm font-semibold transition duration-200 ${
-                        playbackRate === rate
-                          ? 'bg-cyan-300/14 text-cyan-50'
-                          : 'bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
-                      }`}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <aside className="space-y-4">
-              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Exportar
-                </p>
-                <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-white">
-                  Salve a melhor versão
-                </h3>
-                <p className="mt-2 text-sm text-slate-400">
-                  Escolha o formato final depois de revisar imagem, áudio e
-                  ritmo.
-                </p>
-              </div>
-
-              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-4">
-                <label className="mb-3 block text-sm font-semibold text-slate-300">
-                  Formato de saída
-                </label>
-                <div className="grid grid-cols-1 gap-3">
-                  {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map(
-                    (format) => (
-                      <button
-                        key={format}
-                        onClick={() => setSelectedFormat(format)}
-                        className={`rounded-[20px] border p-4 text-left transition duration-200 ${
-                          selectedFormat === format
-                            ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
-                            : 'border-white/10 bg-black/20 text-slate-300 hover:border-white/18'
-                        }`}
-                      >
-                        <div className="mb-1 font-semibold">
-                          {format === 'webm-vp9' && 'WebM (VP9)'}
-                          {format === 'webm-vp8' && 'WebM (VP8)'}
-                          {format === 'mp4' && 'MP4 (H.264)'}
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          {format === 'webm-vp9' &&
-                            'Melhor qualidade, salva rápido'}
-                          {format === 'webm-vp8' &&
-                            'Boa compatibilidade com navegadores'}
-                          {format === 'mp4' &&
-                            'Compatível com tudo — requer conversão via FFmpeg (demora mais)'}
-                        </div>
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 text-sm text-slate-300">
-                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                    Duração
-                  </p>
-                  <p className="mt-2 font-mono text-base font-semibold text-white">
-                    {duration ? formatTime(duration) : 'Carregando...'}
-                  </p>
-                </div>
-                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                    Resolução
-                  </p>
-                  <p className="mt-2 font-semibold text-white">
-                    {resolution || 'Detectando...'}
-                  </p>
-                </div>
-                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                    Tamanho
-                  </p>
-                  <p className="mt-2 font-semibold text-white">{sizeLabel()}</p>
-                </div>
-                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                    Origem
-                  </p>
-                  <p className="mt-2 font-semibold text-white">
-                    {videoBlob.type || 'WebM'}
-                  </p>
-                </div>
-              </div>
-
-              {saveError && (
-                <div className="rounded-[20px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-3 text-sm text-rose-100">
-                  {saveError}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] px-6 text-sm font-bold text-slate-950 shadow-[0_18px_36px_rgba(110,231,249,0.24)] transition duration-200 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Download className="w-5 h-5" />
-                  {isSaving
-                    ? `Salvando${selectedFormat === 'mp4' ? ' (convertendo...)' : '...'}`
-                    : `Salvar como ${selectedFormat === 'webm-vp9' ? 'WebM VP9' : selectedFormat === 'webm-vp8' ? 'WebM VP8' : 'MP4'}`}
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                  className="rounded-[18px] border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-white/[0.08]"
-                >
-                  {isSaving ? 'Salvando...' : 'Descartar gravação'}
-                </button>
-              </div>
-            </aside>
+      {/* Seek bar */}
+      <div className="shrink-0 border-t border-white/6 px-4 py-2">
+        <div className="flex items-center gap-3">
+          <span className="w-10 text-right font-mono text-[11px] text-slate-400">
+            {formatTime(currentTime)}
+          </span>
+          <div className="relative flex-1">
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              value={duration ? currentTime : 0}
+              step="0.1"
+              onChange={(e) => handleSeek(Number(e.target.value))}
+              aria-label="Posição do vídeo"
+              className="relative z-10 w-full cursor-pointer bg-transparent"
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+            />
+            <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 rounded-full bg-white/10" />
+            <div
+              className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-cyan-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
+          <span className="w-10 font-mono text-[11px] text-slate-500">
+            {formatTime(duration || 0)}
+          </span>
         </div>
       </div>
+
+      {/* Controls bar */}
+      <div
+        className="flex shrink-0 items-center gap-3 border-t border-white/8 px-4 py-2.5"
+        style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+      >
+        {/* Playback controls */}
+        <div className="flex items-center gap-1 rounded-[16px] border border-white/8 bg-white/[0.04] p-1">
+          <button
+            onClick={() => handleSkip(-10)}
+            className="flex items-center gap-1 rounded-[12px] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08]"
+            title="Voltar 10s"
+          >
+            <Rewind className="h-3.5 w-3.5" />
+            10s
+          </button>
+          <button
+            onClick={handlePlayPause}
+            className={`flex items-center gap-1.5 rounded-[12px] px-3.5 py-1.5 text-xs font-semibold transition ${
+              isPlaying
+                ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white'
+                : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950'
+            }`}
+          >
+            {isPlaying ? (
+              <Pause className="h-3.5 w-3.5" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {isPlaying ? 'Pausar' : 'Play'}
+          </button>
+          <button
+            onClick={() => handleSkip(10)}
+            className="flex items-center gap-1 rounded-[12px] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08]"
+            title="Avançar 10s"
+          >
+            10s
+            <FastForward className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Mute */}
+        <button
+          onClick={() => setIsMuted((m) => !m)}
+          className="rounded-[12px] border border-white/10 bg-white/[0.04] p-2 text-slate-300 transition hover:bg-white/[0.08]"
+          title={isMuted ? 'Ativar áudio' : 'Silenciar'}
+        >
+          {isMuted ? (
+            <VolumeX className="h-4 w-4" />
+          ) : (
+            <Volume2 className="h-4 w-4" />
+          )}
+        </button>
+
+        <div className="flex-1" />
+
+        {saveError && (
+          <span className="text-xs text-rose-300">{saveError}</span>
+        )}
+
+        {/* Format selector */}
+        <div className="flex items-center gap-1 rounded-[16px] border border-white/8 bg-white/[0.04] p-1">
+          {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map((fmt) => (
+            <button
+              key={fmt}
+              onClick={() => setSelectedFormat(fmt)}
+              className={`rounded-[12px] px-3 py-1.5 text-xs font-semibold transition ${
+                selectedFormat === fmt
+                  ? 'border border-cyan-300/25 bg-cyan-300/14 text-cyan-50'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {formatLabel(fmt)}
+            </button>
+          ))}
+        </div>
+
+        {/* Discard */}
+        <button
+          onClick={() => !isSaving && setShowDiscardConfirm(true)}
+          disabled={isSaving}
+          className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-50"
+        >
+          Descartar
+        </button>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex items-center gap-1.5 rounded-[14px] bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] px-4 py-2 text-xs font-bold text-slate-950 shadow-[0_8px_20px_rgba(110,231,249,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {isSaving
+            ? selectedFormat === 'mp4'
+              ? 'Convertendo...'
+              : 'Salvando...'
+            : `Salvar ${formatLabel(selectedFormat)}`}
+        </button>
+      </div>
+
+      {/* Discard confirm */}
       {showDiscardConfirm && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
@@ -477,33 +341,32 @@ const PreviewPlayer = ({
           aria-modal="true"
           aria-labelledby="discard-dialog-title"
         >
-          <div className="w-full max-w-sm rounded-[24px] border border-white/10 bg-[rgba(12,15,20,0.98)] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
+          <div className="w-full max-w-xs rounded-[20px] border border-white/10 bg-[rgba(12,15,20,0.98)] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
             <h3
               id="discard-dialog-title"
-              className="text-lg font-semibold text-white"
+              className="text-base font-semibold text-white"
             >
               Descartar gravação?
             </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              A gravação não foi salva. Se sair agora, ela será perdida
-              permanentemente.
+            <p className="mt-1.5 text-sm text-slate-400">
+              A gravação não foi salva e será perdida permanentemente.
             </p>
-            <div className="mt-5 flex gap-3">
+            <div className="mt-4 flex gap-2.5">
               <button
                 onClick={() => {
                   setShowDiscardConfirm(false);
                   onCancel();
                 }}
-                className="flex-1 rounded-[16px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-3 text-sm font-semibold text-rose-100 transition duration-200 hover:bg-[#FF5D73]/16"
+                className="flex-1 rounded-[14px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-[#FF5D73]/16"
               >
                 Descartar
               </button>
               <button
                 onClick={() => setShowDiscardConfirm(false)}
                 autoFocus
-                className="flex-1 rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-white/[0.10]"
+                className="flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[0.10]"
               >
-                Continuar editando
+                Continuar
               </button>
             </div>
           </div>

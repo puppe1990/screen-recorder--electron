@@ -510,6 +510,8 @@ const MiniPanel = () => {
         cleanupCaptureRef.current = null;
         setPreviewBlob(new Blob(chunksRef.current, { type: 'video/webm' }));
         setPhase('preview');
+        setIsExpanded(true);
+        window.electronAPI.resizeMiniPanel(true);
       };
 
       recorder.onerror = () => {
