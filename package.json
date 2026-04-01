@@ -5,14 +5,17 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite --strictPort",
+    "dev": "npm run build:main && concurrently -k \"npm run dev:renderer\" \"npm run electron:start\"",
+    "dev:renderer": "vite --strictPort",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . && npm run format:check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "preview": "vite preview",
     "build:main": "tsc -p electron/tsconfig.json && tsc -p electron/preload.tsconfig.json",
     "electron:build": "npm run build:main && vite build",
     "electron:start": "wait-on http-get://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
-    "start": "npm run build:main && concurrently -k \"npm run dev\" \"npm run electron:start\"",
+    "start": "npm run dev",
     "test": "vitest run",
     "build:mac": "npm run electron:build && electron-builder --mac",
     "dist:mac": "npm run build:mac"
@@ -28,6 +31,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
@@ -42,7 +48,9 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^29.0.1",
     "postcss": "^8.5.6",
+    "prettier": "^3.8.1",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
@@ -62,6 +70,7 @@
       "category": "public.app-category.utilities",
       "icon": "public/icon.png",
       "extendInfo": {
+        "NSCameraUsageDescription": "Este app precisa de acesso à câmera para exibir o overlay da webcam durante a gravação.",
         "NSCameraUseContinuityCameraDeviceType": true,
         "NSMicrophoneUsageDescription": "Este app precisa de acesso ao microfone para gravar áudio durante a gravação de tela.",
         "NSScreenCaptureUsageDescription": "Este app precisa de acesso à captura de tela para gravar vídeos e áudio do sistema."

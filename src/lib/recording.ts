@@ -1,6 +1,12 @@
-import type { SaveRecordingResult, VideoFormat } from '../../electron/ipc-contract';
+import type {
+  SaveRecordingResult,
+  VideoFormat,
+} from '../../electron/ipc-contract';
 
-const MIME_TYPE_CANDIDATES: Record<VideoFormat, { audio: string[]; silent: string[] }> = {
+const MIME_TYPE_CANDIDATES: Record<
+  VideoFormat,
+  { audio: string[]; silent: string[] }
+> = {
   'webm-vp9': {
     audio: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus'],
     silent: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8'],
@@ -38,7 +44,8 @@ export const resolveRecorderMimeType = (
   return '';
 };
 
-export const resolveSaveExtension = (format: VideoFormat) => (format === 'mp4' ? 'mp4' : 'webm');
+export const resolveSaveExtension = (format: VideoFormat) =>
+  format === 'mp4' ? 'mp4' : 'webm';
 
 export const getFormatHelperText = (format: VideoFormat) => {
   switch (format) {

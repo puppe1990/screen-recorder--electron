@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Gauge, Pause, Play, Square, X } from 'lucide-react';
 
-const DEFAULT_TELEPROMPTER_TEXT = 'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
+const DEFAULT_TELEPROMPTER_TEXT =
+  'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
 const BASE_WPM = 130; // baseline reading speed
 const MIN_SCROLL_SECONDS = 10;
 const MAX_SCROLL_SECONDS = 600;
@@ -25,7 +26,10 @@ const Teleprompter = () => {
   const duration = useMemo(() => {
     const words = text.trim().split(/\s+/).filter(Boolean).length;
     const secondsForWords = words > 0 ? (words / BASE_WPM) * 60 : 30;
-    return Math.min(Math.max(secondsForWords / speed, MIN_SCROLL_SECONDS), MAX_SCROLL_SECONDS);
+    return Math.min(
+      Math.max(secondsForWords / speed, MIN_SCROLL_SECONDS),
+      MAX_SCROLL_SECONDS
+    );
   }, [text, speed]);
 
   useEffect(() => {
@@ -119,7 +123,10 @@ const Teleprompter = () => {
 
     const animate = (timestamp: number) => {
       if (startRef.current === null) {
-        const currentProgress = Math.min(Math.abs(offsetRef.current) / distance, 1);
+        const currentProgress = Math.min(
+          Math.abs(offsetRef.current) / distance,
+          1
+        );
         startRef.current = timestamp - currentProgress * durationMs;
       }
 
@@ -174,10 +181,10 @@ const Teleprompter = () => {
             e.stopPropagation();
           }}
           className="p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800"
-          style={{ 
+          style={{
             pointerEvents: 'auto',
             userSelect: 'none',
-            zIndex: 9999
+            zIndex: 9999,
           }}
           title="Fechar Teleprompter (ou pressione ESC)"
         >
@@ -199,8 +206,10 @@ const Teleprompter = () => {
       </div>
 
       {/* Controls */}
-      <div className="no-drag flex flex-wrap items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 shadow-lg backdrop-blur-md"
-        style={{ pointerEvents: 'auto' }}>
+      <div
+        className="no-drag flex flex-wrap items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 shadow-lg backdrop-blur-md"
+        style={{ pointerEvents: 'auto' }}
+      >
         <button
           onClick={handlePlay}
           className="flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
@@ -238,7 +247,9 @@ const Teleprompter = () => {
             className="w-32 accent-purple-400"
             title="Velocidade do texto"
           />
-          <span className="font-semibold w-10 text-right">{speed.toFixed(1)}x</span>
+          <span className="font-semibold w-10 text-right">
+            {speed.toFixed(1)}x
+          </span>
         </div>
       </div>
       <style>{`

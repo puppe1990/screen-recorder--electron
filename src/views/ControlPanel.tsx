@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Circle, Eye, EyeOff, Minimize2, Monitor, MousePointer2, Type, Video } from 'lucide-react';
+import {
+  Circle,
+  Eye,
+  EyeOff,
+  Minimize2,
+  Monitor,
+  MousePointer2,
+  Type,
+  Video,
+} from 'lucide-react';
 import type {
   CameraShape,
   CameraSize,
@@ -39,7 +48,9 @@ const stopTracks = (tracks: MediaStreamTrack[]) => {
   });
 };
 
-const createCaptureBundle = async (selectedSourceId: string): Promise<CaptureBundle> => {
+const createCaptureBundle = async (
+  selectedSourceId: string
+): Promise<CaptureBundle> => {
   const screenStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       // @ts-expect-error Electron desktop capture constraints
@@ -97,7 +108,9 @@ const createCaptureBundle = async (selectedSourceId: string): Promise<CaptureBun
       audioContext!.createMediaStreamSource(stream).connect(destination);
     });
 
-    destination.stream.getAudioTracks().forEach((track) => finalStream.addTrack(track));
+    destination.stream
+      .getAudioTracks()
+      .forEach((track) => finalStream.addTrack(track));
   }
 
   const cleanup = () => {
@@ -151,9 +164,13 @@ const ControlPanel = () => {
       setErrorMessage(null);
 
       if (nextSources.length > 0) {
-        const preferredSource = nextSources.find((source) => source.id.startsWith('screen:')) ?? nextSources[0];
+        const preferredSource =
+          nextSources.find((source) => source.id.startsWith('screen:')) ??
+          nextSources[0];
         setSelectedSourceId(preferredSource.id);
-        setPhase((currentPhase) => (currentPhase === 'error' ? 'idle' : currentPhase));
+        setPhase((currentPhase) =>
+          currentPhase === 'error' ? 'idle' : currentPhase
+        );
         return;
       }
 
@@ -162,7 +179,10 @@ const ControlPanel = () => {
       setErrorMessage('Nenhuma fonte de gravação está disponível no momento.');
       window.electronAPI.showControlWindow();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível listar as fontes de gravação.';
       setSources([]);
       setSelectedSourceId('');
       setPhase('error');
@@ -282,7 +302,9 @@ const ControlPanel = () => {
         cleanupCaptureRef.current?.();
         cleanupCaptureRef.current = null;
         setPhase('error');
-        setErrorMessage('A gravação falhou antes de finalizar. Tente novamente.');
+        setErrorMessage(
+          'A gravação falhou antes de finalizar. Tente novamente.'
+        );
         window.electronAPI.showControlWindow();
       };
 
@@ -302,7 +324,10 @@ const ControlPanel = () => {
     } catch (error) {
       captureBundle?.cleanup();
       cleanupCaptureRef.current = null;
-      const message = error instanceof Error ? error.message : 'Erro desconhecido ao iniciar a gravação.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Erro desconhecido ao iniciar a gravação.';
       setPhase('error');
       setErrorMessage(message);
       window.electronAPI.showControlWindow();
@@ -314,7 +339,9 @@ const ControlPanel = () => {
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
     }
-    setPhase((currentPhase) => (currentPhase === 'saving' ? currentPhase : 'idle'));
+    setPhase((currentPhase) =>
+      currentPhase === 'saving' ? currentPhase : 'idle'
+    );
   }, []);
 
   useEffect(() => {
@@ -390,7 +417,9 @@ const ControlPanel = () => {
                 <h1 className="bg-gradient-to-r from-white via-blue-100 to-blue-300 bg-clip-text text-4xl font-bold text-transparent">
                   Studio Recorder
                 </h1>
-                <p className="mt-1 text-sm text-slate-400">Gravação de tela com câmera, preview e teleprompter.</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Gravação de tela com câmera, preview e teleprompter.
+                </p>
               </div>
             </div>
 
@@ -424,24 +453,39 @@ const ControlPanel = () => {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-white">Gravação</h2>
-                    <p className="text-sm text-slate-400">Selecione a tela, ajuste a câmera e inicie quando estiver pronto.</p>
+                    <p className="text-sm text-slate-400">
+                      Selecione a tela, ajuste a câmera e inicie quando estiver
+                      pronto.
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-6">
                   <div>
-                    <label className="mb-3 block text-sm font-semibold text-slate-300">Fonte de gravação</label>
+                    <label className="mb-3 block text-sm font-semibold text-slate-300">
+                      Fonte de gravação
+                    </label>
                     <div className="relative">
                       <select
                         className="w-full appearance-none rounded-xl border-2 border-slate-700 bg-slate-900/80 p-4 pr-12 text-base text-white outline-none transition-all hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                         value={selectedSourceId}
-                        onChange={(event) => setSelectedSourceId(event.target.value)}
+                        onChange={(event) =>
+                          setSelectedSourceId(event.target.value)
+                        }
                       >
                         {sources.length === 0 ? (
-                          <option value="">{errorMessage ? 'Nenhuma fonte disponível' : 'Carregando fontes...'}</option>
+                          <option value="">
+                            {errorMessage
+                              ? 'Nenhuma fonte disponível'
+                              : 'Carregando fontes...'}
+                          </option>
                         ) : (
                           sources.map((source) => (
-                            <option key={source.id} value={source.id} className="bg-slate-800">
+                            <option
+                              key={source.id}
+                              value={source.id}
+                              className="bg-slate-800"
+                            >
                               {source.name}
                             </option>
                           ))
@@ -464,30 +508,38 @@ const ControlPanel = () => {
                   </div>
 
                   <div>
-                    <label className="mb-3 block text-sm font-semibold text-slate-300">Formato de exportação</label>
+                    <label className="mb-3 block text-sm font-semibold text-slate-300">
+                      Formato de exportação
+                    </label>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                      {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map((format) => (
-                        <button
-                          key={format}
-                          type="button"
-                          disabled={isRecording}
-                          onClick={() => setVideoFormat(format)}
-                          className={`rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                            videoFormat === format
-                              ? 'border-blue-500 bg-blue-500/10 text-blue-200'
-                              : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-slate-600'
-                          }`}
-                        >
-                          <div className="font-semibold">
-                            {format === 'webm-vp9' && 'WebM (VP9)'}
-                            {format === 'webm-vp8' && 'WebM (VP8)'}
-                            {format === 'mp4' && 'MP4 (H.264)'}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-400">{getFormatHelperText(format)}</div>
-                        </button>
-                      ))}
+                      {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map(
+                        (format) => (
+                          <button
+                            key={format}
+                            type="button"
+                            disabled={isRecording}
+                            onClick={() => setVideoFormat(format)}
+                            className={`rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                              videoFormat === format
+                                ? 'border-blue-500 bg-blue-500/10 text-blue-200'
+                                : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-slate-600'
+                            }`}
+                          >
+                            <div className="font-semibold">
+                              {format === 'webm-vp9' && 'WebM (VP9)'}
+                              {format === 'webm-vp8' && 'WebM (VP8)'}
+                              {format === 'mp4' && 'MP4 (H.264)'}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              {getFormatHelperText(format)}
+                            </div>
+                          </button>
+                        )
+                      )}
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">Extensão final: .{resolveSaveExtension(videoFormat)}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Extensão final: .{resolveSaveExtension(videoFormat)}
+                    </p>
                   </div>
 
                   <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-50">
@@ -497,7 +549,9 @@ const ControlPanel = () => {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <button
-                      onClick={() => window.electronAPI.openTeleprompterControl()}
+                      onClick={() =>
+                        window.electronAPI.openTeleprompterControl()
+                      }
                       className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
                     >
                       <Type className="h-4 w-4" />
@@ -512,7 +566,11 @@ const ControlPanel = () => {
                           : 'bg-slate-700 text-slate-100 hover:bg-slate-600'
                       }`}
                     >
-                      {cameraVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      {cameraVisible ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOff className="h-4 w-4" />
+                      )}
                       {cameraVisible ? 'Ocultar câmera' : 'Mostrar câmera'}
                     </button>
                   </div>
@@ -522,57 +580,79 @@ const ControlPanel = () => {
 
             <aside className="space-y-6">
               <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-6 shadow-2xl backdrop-blur-xl">
-                <h3 className="mb-4 text-lg font-semibold text-white">Overlay da câmera</h3>
+                <h3 className="mb-4 text-lg font-semibold text-white">
+                  Overlay da câmera
+                </h3>
                 <div className="space-y-4">
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Formato</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Formato
+                    </p>
                     <div className="flex gap-2">
-                      {(['circle', 'rounded', 'square'] as CameraShape[]).map((shape) => (
-                        <button
-                          key={shape}
-                          onClick={() => handleCameraShape(shape)}
-                          className={`flex-1 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
-                            cameraShape === shape
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
-                          }`}
-                        >
-                          {shape === 'circle' && <Circle className="mx-auto h-4 w-4" />}
-                          {shape === 'rounded' && <span>Arred.</span>}
-                          {shape === 'square' && <span>Quadr.</span>}
-                        </button>
-                      ))}
+                      {(['circle', 'rounded', 'square'] as CameraShape[]).map(
+                        (shape) => (
+                          <button
+                            key={shape}
+                            onClick={() => handleCameraShape(shape)}
+                            className={`flex-1 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
+                              cameraShape === shape
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {shape === 'circle' && (
+                              <Circle className="mx-auto h-4 w-4" />
+                            )}
+                            {shape === 'rounded' && <span>Arred.</span>}
+                            {shape === 'square' && <span>Quadr.</span>}
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Tamanho</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Tamanho
+                    </p>
                     <div className="grid grid-cols-3 gap-2">
-                      {(['small', 'medium', 'large'] as CameraSize[]).map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => handleCameraSize(size)}
-                          className={`rounded-xl px-3 py-3 text-sm font-semibold uppercase transition-colors ${
-                            cameraSize === size
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
-                          }`}
-                        >
-                          {size === 'small' ? 'P' : size === 'medium' ? 'M' : 'G'}
-                        </button>
-                      ))}
+                      {(['small', 'medium', 'large'] as CameraSize[]).map(
+                        (size) => (
+                          <button
+                            key={size}
+                            onClick={() => handleCameraSize(size)}
+                            className={`rounded-xl px-3 py-3 text-sm font-semibold uppercase transition-colors ${
+                              cameraSize === size
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {size === 'small'
+                              ? 'P'
+                              : size === 'medium'
+                                ? 'M'
+                                : 'G'}
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-6 shadow-2xl backdrop-blur-xl">
-                <h3 className="mb-2 text-lg font-semibold text-white">Status</h3>
+                <h3 className="mb-2 text-lg font-semibold text-white">
+                  Status
+                </h3>
                 <p className="text-sm text-slate-400">
-                  {phase === 'recording' && 'Gravando agora. Use o mini painel ou este painel para parar.'}
-                  {phase === 'preview' && 'Preview pronto. Revise o vídeo antes de salvar.'}
-                  {phase === 'saving' && 'Salvando arquivo no formato escolhido.'}
-                  {(phase === 'idle' || phase === 'error') && 'Pronto para uma nova gravação.'}
+                  {phase === 'recording' &&
+                    'Gravando agora. Use o mini painel ou este painel para parar.'}
+                  {phase === 'preview' &&
+                    'Preview pronto. Revise o vídeo antes de salvar.'}
+                  {phase === 'saving' &&
+                    'Salvando arquivo no formato escolhido.'}
+                  {(phase === 'idle' || phase === 'error') &&
+                    'Pronto para uma nova gravação.'}
                 </p>
 
                 <button

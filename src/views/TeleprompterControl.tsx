@@ -16,7 +16,10 @@ const TeleprompterControl = () => {
           setText(saved);
         }
       } catch (error) {
-        console.error('Não foi possível carregar o texto do teleprompter:', error);
+        console.error(
+          'Não foi possível carregar o texto do teleprompter:',
+          error
+        );
         setStatus('error');
       }
     };
@@ -66,8 +69,12 @@ const TeleprompterControl = () => {
               <Type className="w-6 h-6 text-purple-300" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Centro de Controle do Teleprompter</h1>
-              <p className="text-slate-400 text-sm">Edite o roteiro e controle a janela do teleprompter.</p>
+              <h1 className="text-2xl font-bold">
+                Centro de Controle do Teleprompter
+              </h1>
+              <p className="text-slate-400 text-sm">
+                Edite o roteiro e controle a janela do teleprompter.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -116,7 +123,9 @@ const TeleprompterControl = () => {
                     ? 'Sincronizando...'
                     : 'Pronto'}
               </span>
-              <span className="text-slate-500">Atualiza a janela do teleprompter em tempo real.</span>
+              <span className="text-slate-500">
+                Atualiza a janela do teleprompter em tempo real.
+              </span>
             </div>
           </div>
 
@@ -126,12 +135,16 @@ const TeleprompterControl = () => {
               Dicas rápidas
             </div>
             <ul className="space-y-2 text-sm text-slate-400 list-disc list-inside">
-              <li>Use Abrir para exibir o teleprompter flutuante sem fechar este painel.</li>
+              <li>
+                Use Abrir para exibir o teleprompter flutuante sem fechar este
+                painel.
+              </li>
               <li>Edite o texto aqui e veja a atualização em tempo real.</li>
               <li>Use Fechar apenas para recolher o overlay da leitura.</li>
             </ul>
             <div className="text-xs text-slate-500 border-t border-slate-800 pt-3">
-              A janela do teleprompter não aparece na gravação porque tem proteção de captura ativada.
+              A janela do teleprompter não aparece na gravação porque tem
+              proteção de captura ativada.
             </div>
           </div>
         </div>

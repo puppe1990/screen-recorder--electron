@@ -36,6 +36,7 @@ describe('createElectronApi', () => {
       startRecording: expect.any(Function),
       onStartRecordingTrigger: expect.any(Function),
       getRecordingState: expect.any(Function),
+      resizeMiniPanel: expect.any(Function),
     });
   });
 
@@ -55,5 +56,14 @@ describe('createElectronApi', () => {
       IPC_CHANNELS.cameraShapeChanged,
       expect.any(Function)
     );
+  });
+
+  it('sends a resize command for the mini panel', () => {
+    const ipc = createMockIpc();
+    const api = createElectronApi(ipc);
+
+    api.resizeMiniPanel(true);
+
+    expect(ipc.send).toHaveBeenCalledWith(IPC_CHANNELS.resizeMiniPanel, true);
   });
 });

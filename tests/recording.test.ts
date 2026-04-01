@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { getFormatHelperText, getSaveResultMessage, resolveRecorderMimeType, resolveSaveExtension } from '../src/lib/recording';
+import {
+  getFormatHelperText,
+  getSaveResultMessage,
+  resolveRecorderMimeType,
+  resolveSaveExtension,
+} from '../src/lib/recording';
 
 describe('recording helpers', () => {
   it('selects a supported MIME type with audio when available', () => {
-    const mimeType = resolveRecorderMimeType('webm-vp9', true, (candidate) =>
-      candidate === 'video/webm;codecs=vp9,opus'
+    const mimeType = resolveRecorderMimeType(
+      'webm-vp9',
+      true,
+      (candidate) => candidate === 'video/webm;codecs=vp9,opus'
     );
 
     expect(mimeType).toBe('video/webm;codecs=vp9,opus');

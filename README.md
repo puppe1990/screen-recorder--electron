@@ -5,12 +5,14 @@ Um aplicativo profissional de gravação de tela desenvolvido com Electron, Reac
 ## ✨ Funcionalidades
 
 ### 🖥️ Gravação de Tela
+
 - **Seleção de Fonte**: Escolha entre gravar a tela inteira, janelas específicas ou aplicativos individuais
 - **Múltiplos Formatos**: Suporte para WebM (VP9/VP8) e MP4 (H.264)
 - **Alta Qualidade**: Gravação em até 1080p com taxa de bits configurável
 - **Ocultação Automática**: Janela de controle é automaticamente ocultada durante a gravação
 
 ### 📹 Overlay de Câmera
+
 - **Janela Transparente**: Overlay flutuante que aparece sobre qualquer aplicativo
 - **Formatos Personalizáveis**: Escolha entre formato circular, quadrado ou arredondado
 - **Tamanhos Ajustáveis**: Pequeno (200x200), Médio (300x300) ou Grande (450x450)
@@ -18,6 +20,7 @@ Um aplicativo profissional de gravação de tela desenvolvido com Electron, Reac
 - **Sempre no Topo**: A janela permanece visível acima de outras aplicações
 
 ### 📝 Teleprompter
+
 - **Texto em Tempo Real**: Digite seu script no painel de controle e veja aparecer instantaneamente no teleprompter
 - **Animação Automática**: O texto rola automaticamente em uma animação suave
 - **Protegido**: O teleprompter não aparece nas gravações (proteção contra captura)
@@ -43,12 +46,14 @@ Antes de começar, certifique-se de ter instalado:
 ## 🛠️ Instalação
 
 1. Clone o repositório:
+
 ```bash
 git clone https://github.com/seu-usuario/screen-recorder-electron.git
 cd screen-recorder-electron
 ```
 
 2. Instale as dependências:
+
 ```bash
 npm install
 ```
@@ -62,6 +67,7 @@ npm start
 ```
 
 Este comando irá:
+
 - Compilar o código TypeScript do Electron
 - Iniciar o servidor de desenvolvimento do Vite
 - Abrir a aplicação Electron
@@ -77,6 +83,7 @@ npm run electron:build
 ```
 
 Isso irá:
+
 - Compilar o código TypeScript
 - Fazer o build do frontend React
 - Gerar os arquivos na pasta `dist` e `dist-electron`
@@ -137,6 +144,7 @@ Para criar um executável instalável, você precisará configurar o `electron-b
 ### Permissões Necessárias
 
 No macOS, você precisará conceder as seguintes permissões:
+
 - **Acesso à Tela**: Para gravar a tela
 - **Acesso à Câmera**: Para usar a webcam no overlay
 

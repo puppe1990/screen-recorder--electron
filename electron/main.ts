@@ -1,4 +1,16 @@
-import { app, BrowserWindow, Menu, Tray, desktopCapturer, dialog, ipcMain, nativeImage, screen, session, systemPreferences } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  desktopCapturer,
+  dialog,
+  ipcMain,
+  nativeImage,
+  screen,
+  session,
+  systemPreferences,
+} from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -25,18 +37,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 process.env.DIST = path.join(__dirname, '../dist');
-process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
+process.env.VITE_PUBLIC = app.isPackaged
+  ? process.env.DIST
+  : path.join(process.env.DIST, '../public');
 
 const DIST_PATH = process.env.DIST!;
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-const isDev = !app.isPackaged;
 const preloadPath = path.join(__dirname, 'preload.js');
 
 const DEFAULT_TELEPROMPTER_TEXT =
   'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
 const INTERNAL_WINDOW_TITLES = ['studio recorder', 'teleprompter control'];
 
-let controlWindow: BrowserWindow | null = null;
 let cameraWindow: BrowserWindow | null = null;
 let teleprompterWindow: BrowserWindow | null = null;
 let miniPanelWindow: BrowserWindow | null = null;
@@ -45,8 +57,11 @@ let tray: Tray | null = null;
 let currentRecordingState = false;
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
 let cameraStatusMessage: string | null = null;
+const MINI_PANEL_COLLAPSED = { width: 460, height: 148 };
+const MINI_PANEL_EXPANDED = { width: 960, height: 620 };
 
-const hasWindow = (window: BrowserWindow | null): window is BrowserWindow => Boolean(window && !window.isDestroyed());
+const hasWindow = (window: BrowserWindow | null): window is BrowserWindow =>
+  Boolean(window && !window.isDestroyed());
 
 const loadRendererView = (window: BrowserWindow, hash: string) => {
   if (VITE_DEV_SERVER_URL) {
@@ -71,13 +86,40 @@ const hideWindow = (window: BrowserWindow | null) => {
   }
 };
 
-const sendToWindow = <T>(window: BrowserWindow | null, channel: string, payload?: T) => {
+const sendToWindow = <T>(
+  window: BrowserWindow | null,
+  channel: string,
+  payload?: T
+) => {
   if (!hasWindow(window)) return;
   if (payload === undefined) {
     window.webContents.send(channel);
     return;
   }
   window.webContents.send(channel, payload);
+};
+
+const getMiniPanelBounds = (expanded: boolean) => {
+  const display = screen.getPrimaryDisplay().workArea;
+  const panelSize = expanded ? MINI_PANEL_EXPANDED : MINI_PANEL_COLLAPSED;
+  const bottomMargin = 24;
+  const x = Math.floor(display.x + (display.width - panelSize.width) / 2);
+  const y = Math.max(
+    display.y + 24,
+    display.y + display.height - (panelSize.height + bottomMargin)
+  );
+
+  return {
+    x,
+    y,
+    width: panelSize.width,
+    height: panelSize.height,
+  };
+};
+
+const resizeMiniPanelWindow = (expanded: boolean) => {
+  if (!hasWindow(miniPanelWindow)) return;
+  miniPanelWindow.setBounds(getMiniPanelBounds(expanded), true);
 };
 
 const getCameraBoundsForSize = (size: CameraSize) => {
@@ -92,7 +134,8 @@ const getCameraBoundsForSize = (size: CameraSize) => {
   }
 };
 
-const getOutputExtension = (format: VideoFormat) => (format === 'mp4' ? 'mp4' : 'webm');
+const getOutputExtension = (format: VideoFormat) =>
+  format === 'mp4' ? 'mp4' : 'webm';
 
 const saveFailure = (
   code: SaveRecordingFailure['code'],
@@ -105,8 +148,12 @@ const saveFailure = (
 
 const isInternalSource = (name: string) => {
   const normalizedName = name.toLowerCase();
-  const matchesControlWindow = INTERNAL_WINDOW_TITLES.some((title) => normalizedName.includes(title));
-  const matchesMiniPanel = normalizedName.includes('mini panel') || normalizedName.includes('mini painel');
+  const matchesControlWindow = INTERNAL_WINDOW_TITLES.some((title) =>
+    normalizedName.includes(title)
+  );
+  const matchesMiniPanel =
+    normalizedName.includes('mini panel') ||
+    normalizedName.includes('mini painel');
   const matchesTeleprompterWindow = normalizedName === 'teleprompter';
 
   return matchesControlWindow || matchesMiniPanel || matchesTeleprompterWindow;
@@ -114,7 +161,9 @@ const isInternalSource = (name: string) => {
 
 const getTrayImage = () => {
   const iconPath = path.join(process.env.VITE_PUBLIC || DIST_PATH, 'icon.png');
-  const image = nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 });
+  const image = nativeImage
+    .createFromPath(iconPath)
+    .resize({ width: 18, height: 18 });
 
   if (process.platform === 'darwin') {
     image.setTemplateImage(true);
@@ -136,10 +185,11 @@ const createTray = () => {
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Abrir painel principal',
+        label: 'Expandir painel',
         click: () => {
-          createControlWindow();
-          hideWindow(miniPanelWindow);
+          createMiniPanelWindow();
+          showWindow(miniPanelWindow);
+          resizeMiniPanelWindow(true);
         },
       },
       {
@@ -147,10 +197,14 @@ const createTray = () => {
         click: () => {
           createMiniPanelWindow();
           showWindow(miniPanelWindow);
+          resizeMiniPanelWindow(false);
         },
       },
       {
-        label: hasWindow(cameraWindow) && cameraWindow.isVisible() ? 'Ocultar camera' : 'Mostrar camera',
+        label:
+          hasWindow(cameraWindow) && cameraWindow.isVisible()
+            ? 'Ocultar camera'
+            : 'Mostrar camera',
         click: () => {
           if (!hasWindow(cameraWindow)) {
             createCameraWindow();
@@ -178,8 +232,8 @@ const createTray = () => {
   };
 
   tray.on('click', () => {
-    createControlWindow();
-    hideWindow(miniPanelWindow);
+    createMiniPanelWindow();
+    showWindow(miniPanelWindow);
     refreshTrayMenu();
   });
 
@@ -187,67 +241,18 @@ const createTray = () => {
   return tray;
 };
 
-function createControlWindow(options?: { show?: boolean }) {
-  const shouldShow = options?.show ?? true;
-
-  if (hasWindow(controlWindow)) {
-    if (shouldShow) {
-      showWindow(controlWindow);
-    }
-    return controlWindow;
-  }
-
-  const iconPath = path.join(process.env.VITE_PUBLIC || DIST_PATH, 'icon.png');
-
-  controlWindow = new BrowserWindow({
-    width: 980,
-    height: 720,
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
-    title: 'Studio Recorder',
-    show: shouldShow,
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  loadRendererView(controlWindow, 'control');
-
-  controlWindow.webContents.once('did-finish-load', () => {
-    if (!hasWindow(controlWindow)) return;
-    controlWindow.setContentProtection(true);
-    if (shouldShow && process.platform === 'darwin') {
-      controlWindow.show();
-      app.dock?.show();
-    }
-    if (isDev && shouldShow) {
-      controlWindow.webContents.openDevTools({ mode: 'detach' });
-    }
-  });
-
-  controlWindow.on('closed', () => {
-    controlWindow = null;
-  });
-
-  return controlWindow;
-}
-
 function createMiniPanelWindow() {
   if (hasWindow(miniPanelWindow)) {
     return miniPanelWindow;
   }
 
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const panelWidth = 760;
-  const panelHeight = 130;
-  const bottomMargin = 20;
+  const bounds = getMiniPanelBounds(false);
 
   miniPanelWindow = new BrowserWindow({
-    width: panelWidth,
-    height: panelHeight,
-    x: Math.floor((width - panelWidth) / 2),
-    y: height - (panelHeight + bottomMargin),
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -300,7 +305,11 @@ function createCameraWindow() {
   loadRendererView(cameraWindow, 'camera');
 
   cameraWindow.webContents.once('did-finish-load', () => {
-    sendToWindow(cameraWindow, IPC_CHANNELS.cameraStatusChanged, cameraStatusMessage);
+    sendToWindow(
+      cameraWindow,
+      IPC_CHANNELS.cameraStatusChanged,
+      cameraStatusMessage
+    );
   });
 
   cameraWindow.on('closed', () => {
@@ -311,20 +320,28 @@ function createCameraWindow() {
 }
 
 const configureMediaPermissions = async () => {
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === 'media';
-  });
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission) => {
+      return permission === 'media';
+    }
+  );
 
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === 'media');
-  });
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      callback(permission === 'media');
+    }
+  );
 
   if (process.platform === 'darwin') {
-    const cameraGranted = await systemPreferences.askForMediaAccess('camera').catch(() => false);
+    const cameraGranted = await systemPreferences
+      .askForMediaAccess('camera')
+      .catch(() => false);
     await systemPreferences.askForMediaAccess('microphone').catch(() => false);
 
     if (!cameraGranted) {
-      setCameraStatus('Permita acesso à câmera nas configurações do macOS para exibir o overlay.');
+      setCameraStatus(
+        'Permita acesso à câmera nas configurações do macOS para exibir o overlay.'
+      );
       return;
     }
   }
@@ -346,13 +363,19 @@ const getScreenCaptureErrorMessage = (error: unknown) => {
     }
   }
 
-  return error instanceof Error ? error.message : 'Não foi possível listar as fontes de gravação.';
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível listar as fontes de gravação.';
 };
 
 function createTeleprompterWindow() {
   if (hasWindow(teleprompterWindow)) {
     showWindow(teleprompterWindow);
-    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterTextChanged, teleprompterText);
+    sendToWindow(
+      teleprompterWindow,
+      IPC_CHANNELS.teleprompterTextChanged,
+      teleprompterText
+    );
     return teleprompterWindow;
   }
 
@@ -377,7 +400,11 @@ function createTeleprompterWindow() {
   loadRendererView(teleprompterWindow, 'teleprompter');
 
   teleprompterWindow.webContents.once('did-finish-load', () => {
-    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterTextChanged, teleprompterText);
+    sendToWindow(
+      teleprompterWindow,
+      IPC_CHANNELS.teleprompterTextChanged,
+      teleprompterText
+    );
   });
 
   teleprompterWindow.on('closed', () => {
@@ -418,7 +445,6 @@ function createTeleprompterControlWindow() {
 const listCaptureSources = async (): Promise<DesktopSource[]> => {
   const excludedIds = new Set(
     [
-      controlWindow?.getMediaSourceId(),
       teleprompterWindow?.getMediaSourceId(),
       miniPanelWindow?.getMediaSourceId(),
       teleprompterControlWindow?.getMediaSourceId(),
@@ -426,7 +452,9 @@ const listCaptureSources = async (): Promise<DesktopSource[]> => {
   );
 
   try {
-    const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
+    const sources = await desktopCapturer.getSources({
+      types: ['window', 'screen'],
+    });
 
     return sources
       .filter((source) => {
@@ -453,7 +481,9 @@ const listCaptureSources = async (): Promise<DesktopSource[]> => {
   }
 };
 
-const persistRecording = async (request: SaveRecordingRequest): Promise<SaveRecordingResult> => {
+const persistRecording = async (
+  request: SaveRecordingRequest
+): Promise<SaveRecordingResult> => {
   const extension = getOutputExtension(request.format);
   const filters =
     extension === 'mp4'
@@ -463,26 +493,40 @@ const persistRecording = async (request: SaveRecordingRequest): Promise<SaveReco
   const { canceled, filePath } = await dialog.showSaveDialog({
     buttonLabel: 'Salvar vídeo',
     defaultPath: `recording-${Date.now()}.${extension}`,
-    filters: [...filters, { name: 'All Video Formats', extensions: ['webm', 'mp4', 'mov', 'avi'] }],
+    filters: [
+      ...filters,
+      { name: 'All Video Formats', extensions: ['webm', 'mp4', 'mov', 'avi'] },
+    ],
   });
 
   if (canceled || !filePath) {
     return saveFailure('CANCELLED', 'Salvamento cancelado.');
   }
 
-  const targetFilePath = path.extname(filePath).toLowerCase() === `.${extension}`
-    ? filePath
-    : `${filePath.replace(/\.[^.]+$/, '')}.${extension}`;
+  const targetFilePath =
+    path.extname(filePath).toLowerCase() === `.${extension}`
+      ? filePath
+      : `${filePath.replace(/\.[^.]+$/, '')}.${extension}`;
 
   try {
     if (extension === 'mp4') {
-      const tempWebmPath = path.join(app.getPath('temp'), `temp-recording-${Date.now()}.webm`);
+      const tempWebmPath = path.join(
+        app.getPath('temp'),
+        `temp-recording-${Date.now()}.webm`
+      );
       await writeFile(tempWebmPath, Buffer.from(request.buffer));
 
       try {
         await new Promise<void>((resolve, reject) => {
           ffmpeg(tempWebmPath)
-            .outputOptions(['-c:v libx264', '-preset fast', '-crf 23', '-c:a aac', '-b:a 128k', '-movflags +faststart'])
+            .outputOptions([
+              '-c:v libx264',
+              '-preset fast',
+              '-crf 23',
+              '-c:a aac',
+              '-b:a 128k',
+              '-movflags +faststart',
+            ])
             .output(targetFilePath)
             .on('end', () => resolve())
             .on('error', reject)
@@ -500,16 +544,31 @@ const persistRecording = async (request: SaveRecordingRequest): Promise<SaveReco
       filePath: targetFilePath,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha desconhecida ao salvar o vídeo.';
-    return saveFailure(extension === 'mp4' ? 'CONVERSION_FAILED' : 'WRITE_FAILED', message);
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Falha desconhecida ao salvar o vídeo.';
+    return saveFailure(
+      extension === 'mp4' ? 'CONVERSION_FAILED' : 'WRITE_FAILED',
+      message
+    );
   }
 };
 
 const registerIpcHandlers = () => {
   ipcMain.handle(IPC_CHANNELS.getSources, listCaptureSources);
-  ipcMain.handle(IPC_CHANNELS.getRecordingState, async () => currentRecordingState);
-  ipcMain.handle(IPC_CHANNELS.getTeleprompterText, async () => teleprompterText);
-  ipcMain.handle(IPC_CHANNELS.saveRecording, async (_event, request: SaveRecordingRequest) => persistRecording(request));
+  ipcMain.handle(
+    IPC_CHANNELS.getRecordingState,
+    async () => currentRecordingState
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.getTeleprompterText,
+    async () => teleprompterText
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.saveRecording,
+    async (_event, request: SaveRecordingRequest) => persistRecording(request)
+  );
 
   ipcMain.on(IPC_CHANNELS.setCameraShape, (_event, shape: CameraShape) => {
     sendToWindow(cameraWindow, IPC_CHANNELS.cameraShapeChanged, shape);
@@ -523,8 +582,16 @@ const registerIpcHandlers = () => {
 
   ipcMain.on(IPC_CHANNELS.setTeleprompterText, (_event, text: string) => {
     teleprompterText = text;
-    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterTextChanged, text);
-    sendToWindow(teleprompterControlWindow, IPC_CHANNELS.teleprompterTextChanged, text);
+    sendToWindow(
+      teleprompterWindow,
+      IPC_CHANNELS.teleprompterTextChanged,
+      text
+    );
+    sendToWindow(
+      teleprompterControlWindow,
+      IPC_CHANNELS.teleprompterTextChanged,
+      text
+    );
   });
 
   ipcMain.on(IPC_CHANNELS.openTeleprompterControl, () => {
@@ -555,15 +622,28 @@ const registerIpcHandlers = () => {
     showWindow(teleprompterWindow);
   });
 
-  ipcMain.on(IPC_CHANNELS.broadcastRecordingState, (_event, isRecording: boolean) => {
-    currentRecordingState = isRecording;
-    sendToWindow(miniPanelWindow, IPC_CHANNELS.recordingStateChanged, isRecording);
-  });
+  ipcMain.on(
+    IPC_CHANNELS.broadcastRecordingState,
+    (_event, isRecording: boolean) => {
+      currentRecordingState = isRecording;
+      sendToWindow(
+        miniPanelWindow,
+        IPC_CHANNELS.recordingStateChanged,
+        isRecording
+      );
+    }
+  );
 
-  ipcMain.on(IPC_CHANNELS.hideControlWindow, () => hideWindow(controlWindow));
-  ipcMain.on(IPC_CHANNELS.showControlWindow, () => showWindow(controlWindow));
+  ipcMain.on(IPC_CHANNELS.hideControlWindow, () => undefined);
+  ipcMain.on(IPC_CHANNELS.showControlWindow, () => {
+    createMiniPanelWindow();
+    showWindow(miniPanelWindow);
+    resizeMiniPanelWindow(true);
+  });
   ipcMain.on(IPC_CHANNELS.hideCameraWindow, () => hideWindow(cameraWindow));
-  ipcMain.on(IPC_CHANNELS.showCameraWindow, () => showWindow(cameraWindow, false));
+  ipcMain.on(IPC_CHANNELS.showCameraWindow, () =>
+    showWindow(cameraWindow, false)
+  );
 
   ipcMain.on(IPC_CHANNELS.showTimer, () => {
     createMiniPanelWindow();
@@ -576,34 +656,40 @@ const registerIpcHandlers = () => {
   });
 
   ipcMain.on(IPC_CHANNELS.startRecording, () => {
-    const sendStartSignal = () => sendToWindow(controlWindow, IPC_CHANNELS.startRecordingTrigger);
+    const sendStartSignal = () =>
+      sendToWindow(miniPanelWindow, IPC_CHANNELS.startRecordingTrigger);
 
-    if (hasWindow(controlWindow)) {
-      if (controlWindow.webContents.isLoading()) {
-        controlWindow.webContents.once('did-finish-load', sendStartSignal);
+    if (hasWindow(miniPanelWindow)) {
+      if (miniPanelWindow.webContents.isLoading()) {
+        miniPanelWindow.webContents.once('did-finish-load', sendStartSignal);
       } else {
         sendStartSignal();
       }
       return;
     }
 
-    const window = createControlWindow({ show: false });
+    const window = createMiniPanelWindow();
     window.webContents.once('did-finish-load', sendStartSignal);
   });
 
   ipcMain.on(IPC_CHANNELS.stopRecording, () => {
-    sendToWindow(controlWindow, IPC_CHANNELS.stopRecordingTrigger);
+    sendToWindow(miniPanelWindow, IPC_CHANNELS.stopRecordingTrigger);
   });
 
   ipcMain.on(IPC_CHANNELS.showMainPanel, () => {
-    createControlWindow();
-    hideWindow(miniPanelWindow);
+    createMiniPanelWindow();
+    showWindow(miniPanelWindow);
+    resizeMiniPanelWindow(true);
   });
 
   ipcMain.on(IPC_CHANNELS.showMiniPanel, () => {
     createMiniPanelWindow();
     showWindow(miniPanelWindow);
-    hideWindow(controlWindow);
+    resizeMiniPanelWindow(false);
+  });
+
+  ipcMain.on(IPC_CHANNELS.resizeMiniPanel, (_event, expanded: boolean) => {
+    resizeMiniPanelWindow(expanded);
   });
 };
 
@@ -618,7 +704,6 @@ app.whenReady().then(() => {
   createTray();
   createMiniPanelWindow();
   createCameraWindow();
-  createControlWindow({ show: false });
   registerIpcHandlers();
 
   app.on('activate', () => {

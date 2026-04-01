@@ -27,6 +27,7 @@ export const IPC_CHANNELS = {
   recordingStateChanged: 'recording-state-changed',
   showMainPanel: 'show-main-panel',
   showMiniPanel: 'show-mini-panel',
+  resizeMiniPanel: 'resize-mini-panel',
 } as const;
 
 export type CleanupFn = () => void;
@@ -63,12 +64,16 @@ export interface ElectronAPI {
   getSources: () => Promise<DesktopSource[]>;
   setCameraShape: (shape: CameraShape) => void;
   onCameraShapeChange: (callback: (shape: CameraShape) => void) => CleanupFn;
-  onCameraStatusChange: (callback: (message: string | null) => void) => CleanupFn;
+  onCameraStatusChange: (
+    callback: (message: string | null) => void
+  ) => CleanupFn;
   setTeleprompterText: (text: string) => void;
   onTeleprompterTextChange: (callback: (text: string) => void) => CleanupFn;
   getTeleprompterText: () => Promise<string>;
   openTeleprompterControl: () => void;
-  saveRecording: (request: SaveRecordingRequest) => Promise<SaveRecordingResult>;
+  saveRecording: (
+    request: SaveRecordingRequest
+  ) => Promise<SaveRecordingResult>;
   setCameraSize: (size: CameraSize) => void;
   closeTeleprompter: () => void;
   toggleTeleprompter: () => void;
@@ -84,8 +89,11 @@ export interface ElectronAPI {
   startRecording: () => void;
   onStartRecordingTrigger: (callback: () => void) => CleanupFn;
   broadcastRecordingState: (isRecording: boolean) => void;
-  onRecordingStateChange: (callback: (isRecording: boolean) => void) => CleanupFn;
+  onRecordingStateChange: (
+    callback: (isRecording: boolean) => void
+  ) => CleanupFn;
   getRecordingState: () => Promise<boolean>;
   showMainPanel: () => void;
   showMiniPanel: () => void;
+  resizeMiniPanel: (expanded: boolean) => void;
 }

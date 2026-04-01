@@ -23,7 +23,9 @@ const resolveViewFromHash = (hash: string) => {
 };
 
 function App() {
-  const [currentView] = useState(() => resolveViewFromHash(window.location.hash));
+  const [currentView] = useState(() =>
+    resolveViewFromHash(window.location.hash)
+  );
 
   return (
     <div className="h-screen w-screen overflow-auto">

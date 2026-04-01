@@ -34,15 +34,22 @@ export const createElectronApi = (
   ipc: Pick<IpcRenderer, 'invoke' | 'send' | 'on' | 'removeListener'>
 ): ElectronAPI => ({
   getSources: () => ipc.invoke(IPC_CHANNELS.getSources),
-  setCameraShape: (shape: CameraShape) => ipc.send(IPC_CHANNELS.setCameraShape, shape),
-  onCameraShapeChange: (callback) => subscribe(ipc, IPC_CHANNELS.cameraShapeChanged, callback),
-  onCameraStatusChange: (callback) => subscribe(ipc, IPC_CHANNELS.cameraStatusChanged, callback),
-  setTeleprompterText: (text) => ipc.send(IPC_CHANNELS.setTeleprompterText, text),
-  onTeleprompterTextChange: (callback) => subscribe(ipc, IPC_CHANNELS.teleprompterTextChanged, callback),
+  setCameraShape: (shape: CameraShape) =>
+    ipc.send(IPC_CHANNELS.setCameraShape, shape),
+  onCameraShapeChange: (callback) =>
+    subscribe(ipc, IPC_CHANNELS.cameraShapeChanged, callback),
+  onCameraStatusChange: (callback) =>
+    subscribe(ipc, IPC_CHANNELS.cameraStatusChanged, callback),
+  setTeleprompterText: (text) =>
+    ipc.send(IPC_CHANNELS.setTeleprompterText, text),
+  onTeleprompterTextChange: (callback) =>
+    subscribe(ipc, IPC_CHANNELS.teleprompterTextChanged, callback),
   getTeleprompterText: () => ipc.invoke(IPC_CHANNELS.getTeleprompterText),
   openTeleprompterControl: () => ipc.send(IPC_CHANNELS.openTeleprompterControl),
-  saveRecording: (request: SaveRecordingRequest) => ipc.invoke(IPC_CHANNELS.saveRecording, request),
-  setCameraSize: (size: CameraSize) => ipc.send(IPC_CHANNELS.setCameraSize, size),
+  saveRecording: (request: SaveRecordingRequest) =>
+    ipc.invoke(IPC_CHANNELS.saveRecording, request),
+  setCameraSize: (size: CameraSize) =>
+    ipc.send(IPC_CHANNELS.setCameraSize, size),
   closeTeleprompter: () => ipc.send(IPC_CHANNELS.closeTeleprompter),
   toggleTeleprompter: () => ipc.send(IPC_CHANNELS.toggleTeleprompter),
   openTeleprompter: () => ipc.send(IPC_CHANNELS.openTeleprompter),
@@ -53,12 +60,18 @@ export const createElectronApi = (
   showTimer: () => ipc.send(IPC_CHANNELS.showTimer),
   hideTimer: () => ipc.send(IPC_CHANNELS.hideTimer),
   stopRecording: () => ipc.send(IPC_CHANNELS.stopRecording),
-  onStopRecordingTrigger: (callback) => subscribeVoid(ipc, IPC_CHANNELS.stopRecordingTrigger, callback),
+  onStopRecordingTrigger: (callback) =>
+    subscribeVoid(ipc, IPC_CHANNELS.stopRecordingTrigger, callback),
   startRecording: () => ipc.send(IPC_CHANNELS.startRecording),
-  onStartRecordingTrigger: (callback) => subscribeVoid(ipc, IPC_CHANNELS.startRecordingTrigger, callback),
-  broadcastRecordingState: (isRecording: boolean) => ipc.send(IPC_CHANNELS.broadcastRecordingState, isRecording),
-  onRecordingStateChange: (callback) => subscribe(ipc, IPC_CHANNELS.recordingStateChanged, callback),
+  onStartRecordingTrigger: (callback) =>
+    subscribeVoid(ipc, IPC_CHANNELS.startRecordingTrigger, callback),
+  broadcastRecordingState: (isRecording: boolean) =>
+    ipc.send(IPC_CHANNELS.broadcastRecordingState, isRecording),
+  onRecordingStateChange: (callback) =>
+    subscribe(ipc, IPC_CHANNELS.recordingStateChanged, callback),
   getRecordingState: () => ipc.invoke(IPC_CHANNELS.getRecordingState),
   showMainPanel: () => ipc.send(IPC_CHANNELS.showMainPanel),
   showMiniPanel: () => ipc.send(IPC_CHANNELS.showMiniPanel),
+  resizeMiniPanel: (expanded: boolean) =>
+    ipc.send(IPC_CHANNELS.resizeMiniPanel, expanded),
 });

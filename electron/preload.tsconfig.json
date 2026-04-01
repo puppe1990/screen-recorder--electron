@@ -1,16 +1,14 @@
 {
-    "compilerOptions": {
-        "module": "CommonJS",
-        "target": "es2020",
-        "sourceMap": true,
-        "outDir": "../dist-electron",
-        "rootDir": ".",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "moduleResolution": "node"
-    },
-    "include": [
-        "preload.ts"
-    ]
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "es2020",
+    "sourceMap": true,
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node"
+  },
+  "include": ["preload.ts"]
 }
