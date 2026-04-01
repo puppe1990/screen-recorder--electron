@@ -527,6 +527,20 @@ const MiniPanel = () => {
     void startRecording();
   };
 
+  const sectionCardClass =
+    'rounded-[28px] border border-white/8 bg-[rgba(18,23,30,0.88)] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]';
+  const quietButtonClass =
+    'rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 transition duration-200 hover:border-white/18 hover:bg-white/[0.08]';
+  const activeAccentButtonClass =
+    'rounded-[18px] border border-cyan-300/25 bg-cyan-300/14 text-cyan-50 shadow-[0_12px_30px_rgba(110,231,249,0.12)]';
+  const segmentedButtonClass =
+    'rounded-[18px] border border-white/8 bg-black/20 px-3 py-3 text-sm font-semibold text-slate-300 transition duration-200 hover:border-white/16 hover:bg-white/[0.06]';
+  const sectionLabelClass =
+    'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500';
+  const recordingButtonClass = isRecording
+    ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white shadow-[0_18px_40px_rgba(255,93,115,0.28)] hover:brightness-105'
+    : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950 shadow-[0_18px_40px_rgba(110,231,249,0.24)] hover:brightness-105';
+
   return (
     <>
       {showPreview && previewBlob && (
@@ -543,25 +557,26 @@ const MiniPanel = () => {
         className="h-screen w-screen overflow-hidden bg-transparent px-3 py-3 text-white"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="relative mx-auto flex h-full max-w-[1040px] flex-col overflow-hidden rounded-[26px] border border-slate-700/70 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(8,15,32,0.98))] shadow-[0_28px_70px_rgba(15,23,42,0.42)] backdrop-blur-2xl">
-          <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
+        <div className="relative mx-auto flex h-full max-w-[1080px] flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(160deg,rgba(13,16,22,0.98),rgba(8,10,15,0.98))] shadow-[0_30px_120px_rgba(0,0,0,0.52)] backdrop-blur-2xl">
+          <div className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.10),transparent_60%)]" />
 
           <div
-            className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-slate-800/90 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto] py-3'}`}
+            className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-white/8 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto] py-3'}`}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-900/90 text-slate-400">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04] text-slate-400">
                 <GripVertical className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-slate-500">
-                  Studio strip
+                <p className="text-[10px] font-semibold uppercase tracking-[0.34em] text-slate-500">
+                  Capture cockpit
                 </p>
                 <div className="mt-1 flex items-center gap-2">
                   <div
-                    className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.9)]' : 'bg-emerald-400'}`}
+                    className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-[#FF5D73] shadow-[0_0_14px_rgba(255,93,115,0.95)]' : 'bg-[#8CF0C7] shadow-[0_0_10px_rgba(140,240,199,0.4)]'}`}
                   />
-                  <p className="truncate text-sm font-semibold text-slate-100">
+                  <p className="truncate text-sm font-semibold text-slate-50">
                     {statusLabel}
                   </p>
                 </div>
@@ -569,21 +584,17 @@ const MiniPanel = () => {
             </div>
 
             {!isExpanded && (
-              <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-800/80 bg-slate-900/70 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3 rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Fonte
-                  </p>
+                  <p className={sectionLabelClass}>Fonte</p>
                   <p className="truncate text-sm font-medium text-slate-100">
                     {selectedSourceName}
                   </p>
                 </div>
-                <div className="h-8 w-px bg-slate-800" />
+                <div className="h-8 w-px bg-white/8" />
                 <div className="text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Timer
-                  </p>
-                  <p className="font-mono text-lg font-semibold tracking-[0.16em] text-white">
+                  <p className={sectionLabelClass}>Timer</p>
+                  <p className="font-mono text-lg font-semibold tracking-[0.12em] text-white">
                     {isRecording ? formatTime(seconds) : '00:00'}
                   </p>
                 </div>
@@ -592,19 +603,15 @@ const MiniPanel = () => {
 
             {isExpanded && (
               <div className="grid flex-1 grid-cols-[minmax(0,1fr),auto] gap-3">
-                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/65 px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Fonte atual
-                  </p>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3">
+                  <p className={sectionLabelClass}>Fonte atual</p>
                   <p className="mt-1 truncate text-sm font-medium text-slate-100">
                     {selectedSourceName}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/65 px-4 py-3 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Timer
-                  </p>
-                  <p className="mt-1 font-mono text-lg font-semibold tracking-[0.16em] text-white">
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3 text-right">
+                  <p className={sectionLabelClass}>Timer</p>
+                  <p className="mt-1 font-mono text-lg font-semibold tracking-[0.12em] text-white">
                     {isRecording ? formatTime(seconds) : '00:00'}
                   </p>
                 </div>
@@ -622,7 +629,7 @@ const MiniPanel = () => {
                     window.electronAPI.resizeMiniPanel(true);
                   }
                 }}
-                className="rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/18 px-3 py-2.5 text-xs font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/28"
+                className="rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs font-semibold text-slate-100 transition hover:border-cyan-300/25 hover:bg-cyan-300/12"
               >
                 <span className="flex items-center gap-2">
                   <Type className="h-4 w-4" />
@@ -630,10 +637,7 @@ const MiniPanel = () => {
                 </span>
               </button>
 
-              <button
-                onClick={handleToggleExpand}
-                className="rounded-2xl border border-slate-700 bg-slate-900/90 px-3 py-2.5 text-xs font-semibold text-slate-100 transition-colors hover:border-slate-600 hover:bg-slate-800"
-              >
+              <button onClick={handleToggleExpand} className={quietButtonClass}>
                 <span className="flex items-center gap-2">
                   {isExpanded ? (
                     <ChevronUp className="h-4 w-4" />
@@ -646,7 +650,7 @@ const MiniPanel = () => {
 
               <button
                 onClick={() => window.electronAPI.resizeMiniPanel(true)}
-                className="rounded-2xl border border-slate-700 bg-slate-900/90 p-2.5 text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
+                className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3 text-slate-200 transition duration-200 hover:border-white/16 hover:bg-white/[0.08]"
                 title="Expandir este painel"
               >
                 <Monitor className="h-4 w-4" />
@@ -657,11 +661,7 @@ const MiniPanel = () => {
               <button
                 onClick={handleToggleRecording}
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold shadow-lg transition-all ${
-                  isRecording
-                    ? 'bg-gradient-to-r from-rose-600 to-red-700 text-white hover:from-rose-700 hover:to-red-800'
-                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
-                }`}
+                className={`min-w-[170px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 ${recordingButtonClass}`}
                 title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
               >
                 <span className="flex items-center gap-2">
@@ -675,10 +675,10 @@ const MiniPanel = () => {
           {(errorMessage || statusMessage) && (
             <div className="px-4 pb-3">
               <div
-                className={`rounded-2xl border px-4 py-3 text-sm ${
+                className={`rounded-[22px] border px-4 py-3 text-sm ${
                   errorMessage
-                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-100'
-                    : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                    ? 'border-[#FF5D73]/40 bg-[#FF5D73]/10 text-rose-50'
+                    : 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
                 }`}
               >
                 {errorMessage ?? statusMessage}
@@ -688,15 +688,11 @@ const MiniPanel = () => {
 
           {isExpanded && (
             <>
-              <div className="border-t border-slate-800/90 px-4 py-4">
+              <div className="border-t border-white/8 px-4 py-4">
                 <button
                   onClick={handleToggleRecording}
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`w-full rounded-[22px] px-5 py-4 text-sm font-semibold shadow-lg transition-all ${
-                    isRecording
-                      ? 'bg-gradient-to-r from-rose-600 to-red-700 text-white hover:from-rose-700 hover:to-red-800'
-                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
-                  }`}
+                  className={`w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition duration-200 ${recordingButtonClass}`}
                   title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
                 >
                   <span className="flex items-center justify-center gap-2">
@@ -706,16 +702,16 @@ const MiniPanel = () => {
                 </button>
               </div>
 
-              <div className="grid flex-1 grid-cols-1 gap-4 overflow-auto border-t border-slate-800/90 px-4 py-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid flex-1 grid-cols-1 gap-4 overflow-auto border-t border-white/8 px-4 py-4 xl:grid-cols-[1.15fr_0.85fr]">
                 <section className="space-y-4">
                   <div
-                    className="rounded-[26px] border border-slate-800/80 bg-slate-900/58 p-5"
+                    className={sectionCardClass}
                     style={
                       { WebkitAppRegion: 'no-drag' } as React.CSSProperties
                     }
                   >
                     <div className="mb-4 flex items-center gap-3">
-                      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-2 text-cyan-300">
+                      <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-200">
                         <Monitor className="h-5 w-5" />
                       </div>
                       <div>
@@ -730,7 +726,7 @@ const MiniPanel = () => {
 
                     <div className="relative">
                       <select
-                        className="w-full appearance-none rounded-2xl border border-slate-700 bg-slate-950 px-4 py-4 pr-12 text-sm text-white outline-none transition-colors hover:border-slate-600 focus:border-blue-500"
+                        className="w-full appearance-none rounded-[20px] border border-white/10 bg-black/30 px-4 py-4 pr-12 text-sm text-white outline-none transition duration-200 hover:border-white/18 focus:border-cyan-300"
                         value={selectedSourceId}
                         onChange={(event) =>
                           setSelectedSourceId(event.target.value)
@@ -758,7 +754,7 @@ const MiniPanel = () => {
                         type="button"
                         onClick={() => void loadSources()}
                         disabled={isRecording || isSaving}
-                        className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 transition duration-200 hover:border-white/18 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Atualizar fontes
                       </button>
@@ -766,7 +762,7 @@ const MiniPanel = () => {
                   </div>
 
                   <div
-                    className="rounded-[26px] border border-slate-800/80 bg-slate-900/58 p-5"
+                    className={sectionCardClass}
                     style={
                       { WebkitAppRegion: 'no-drag' } as React.CSSProperties
                     }
@@ -786,10 +782,10 @@ const MiniPanel = () => {
                             type="button"
                             disabled={isRecording}
                             onClick={() => setVideoFormat(format)}
-                            className={`rounded-2xl border p-4 text-left transition-all ${
+                            className={`rounded-[20px] border p-4 text-left transition duration-200 ${
                               videoFormat === format
-                                ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                                : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600'
+                                ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
+                                : 'border-white/10 bg-black/25 text-slate-300 hover:border-white/18'
                             }`}
                           >
                             <p className="font-semibold">
@@ -813,7 +809,7 @@ const MiniPanel = () => {
 
                 <aside className="space-y-4">
                   <div
-                    className="rounded-[26px] border border-slate-800/80 bg-slate-900/58 p-5"
+                    className={sectionCardClass}
                     style={
                       { WebkitAppRegion: 'no-drag' } as React.CSSProperties
                     }
@@ -823,9 +819,7 @@ const MiniPanel = () => {
                     </h2>
                     <div className="mt-4 space-y-4">
                       <div>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Formato
-                        </p>
+                        <p className={sectionLabelClass}>Formato</p>
                         <div className="grid grid-cols-3 gap-2">
                           {(
                             ['circle', 'rounded', 'square'] as CameraShape[]
@@ -833,10 +827,10 @@ const MiniPanel = () => {
                             <button
                               key={shape}
                               onClick={() => handleCameraShape(shape)}
-                              className={`rounded-2xl px-3 py-3 text-sm font-semibold transition-colors ${
+                              className={`px-3 py-3 text-sm font-semibold transition duration-200 ${
                                 cameraShape === shape
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
+                                  ? `${segmentedButtonClass} ${activeAccentButtonClass}`
+                                  : segmentedButtonClass
                               }`}
                             >
                               {shape === 'circle' && (
@@ -850,26 +844,24 @@ const MiniPanel = () => {
                       </div>
 
                       <div>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Tamanho
-                        </p>
+                        <p className={sectionLabelClass}>Tamanho</p>
                         <div className="grid grid-cols-3 gap-2">
                           {(['small', 'medium', 'large'] as CameraSize[]).map(
                             (size) => (
                               <button
                                 key={size}
                                 onClick={() => handleCameraSize(size)}
-                                className={`rounded-2xl px-3 py-3 text-sm font-semibold uppercase transition-colors ${
+                                className={`px-3 py-3 text-sm font-semibold transition duration-200 ${
                                   cameraSize === size
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
+                                    ? `${segmentedButtonClass} ${activeAccentButtonClass}`
+                                    : segmentedButtonClass
                                 }`}
                               >
                                 {size === 'small'
-                                  ? 'P'
+                                  ? 'Compacto'
                                   : size === 'medium'
-                                    ? 'M'
-                                    : 'G'}
+                                    ? 'Médio'
+                                    : 'Palco'}
                               </button>
                             )
                           )}
@@ -878,10 +870,10 @@ const MiniPanel = () => {
 
                       <button
                         onClick={handleCameraVisibility}
-                        className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
+                        className={`w-full rounded-[20px] px-4 py-3 text-sm font-semibold transition duration-200 ${
                           cameraVisible
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            : 'bg-slate-950 text-slate-200 hover:bg-slate-800'
+                            ? 'border border-emerald-300/25 bg-emerald-300/12 text-emerald-100 hover:bg-emerald-300/16'
+                            : 'border border-white/10 bg-black/25 text-slate-200 hover:bg-white/[0.06]'
                         }`}
                       >
                         <span className="flex items-center justify-center gap-2">
@@ -896,21 +888,21 @@ const MiniPanel = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-[26px] border border-amber-500/20 bg-amber-500/10 p-5 text-sm text-amber-50">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-200/70">
+                  <div className="rounded-[28px] border border-amber-200/18 bg-[linear-gradient(160deg,rgba(243,201,122,0.10),rgba(243,201,122,0.04))] p-5 text-sm text-amber-50">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200/70">
                       Áudio
                     </p>
                     <p className="mt-2">{audioNotice}</p>
                   </div>
 
                   <div
-                    className="rounded-[26px] border border-slate-800/80 bg-slate-900/58 p-5"
+                    className={sectionCardClass}
                     style={
                       { WebkitAppRegion: 'no-drag' } as React.CSSProperties
                     }
                   >
                     <div className="mb-4 flex items-center gap-3">
-                      <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-2 text-fuchsia-300">
+                      <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-200">
                         <StickyNote className="h-5 w-5" />
                       </div>
                       <div>
@@ -926,7 +918,7 @@ const MiniPanel = () => {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => window.electronAPI.openTeleprompter()}
-                        className="rounded-2xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                        className="rounded-[18px] border border-cyan-300/25 bg-cyan-300/14 px-3 py-2.5 text-xs font-semibold text-cyan-50 transition duration-200 hover:bg-cyan-300/18"
                       >
                         <span className="flex items-center gap-2">
                           <Play className="h-4 w-4" />
@@ -935,7 +927,7 @@ const MiniPanel = () => {
                       </button>
                       <button
                         onClick={() => window.electronAPI.closeTeleprompter()}
-                        className="rounded-2xl bg-rose-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700"
+                        className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-semibold text-slate-200 transition duration-200 hover:border-white/18 hover:bg-white/[0.08]"
                       >
                         <span className="flex items-center gap-2">
                           <XCircle className="h-4 w-4" />
@@ -945,7 +937,7 @@ const MiniPanel = () => {
                     </div>
 
                     <textarea
-                      className="mt-4 h-52 w-full rounded-3xl border border-slate-700 bg-slate-950 px-4 py-4 text-sm leading-relaxed text-white outline-none transition-colors placeholder:text-slate-500 focus:border-fuchsia-500"
+                      className="mt-4 h-52 w-full rounded-[24px] border border-white/10 bg-black/25 px-5 py-4 text-sm leading-relaxed text-white outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300"
                       placeholder="Cole ou escreva o texto do teleprompter..."
                       value={teleprompterText}
                       onChange={(event) =>
@@ -957,10 +949,10 @@ const MiniPanel = () => {
                       <span
                         className={`rounded-full border px-2.5 py-1 ${
                           teleprompterStatus === 'error'
-                            ? 'border-rose-500/60 text-rose-300'
+                            ? 'border-[#FF5D73]/60 text-rose-300'
                             : teleprompterStatus === 'sync'
-                              ? 'border-emerald-500/60 text-emerald-300'
-                              : 'border-slate-700 text-slate-400'
+                              ? 'border-cyan-300/60 text-cyan-200'
+                              : 'border-white/10 text-slate-400'
                         }`}
                       >
                         {teleprompterStatus === 'error'

@@ -22,7 +22,7 @@ function App() {
   );
 
   return (
-    <div className="h-screen w-screen overflow-auto">
+    <div className="h-screen w-screen overflow-auto bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_24%),#07090d] text-white">
       {currentView === 'camera' && <CameraOverlay />}
       {currentView === 'teleprompter' && <Teleprompter />}
       {currentView === 'minipanel' && <MiniPanel />}

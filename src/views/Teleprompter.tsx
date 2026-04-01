@@ -168,8 +168,10 @@ const Teleprompter = () => {
   };
 
   return (
-    <div className="w-full h-full bg-black/60 text-white p-5 overflow-hidden relative flex flex-col gap-4 drag-region">
-      <div className="flex justify-end no-drag">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white drag-region">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.55),rgba(0,0,0,0.22)_20%,rgba(0,0,0,0.22)_80%,rgba(0,0,0,0.72))]" />
+
+      <div className="relative z-10 flex justify-end px-6 pt-6 no-drag">
         <button
           onClick={handleClose}
           onMouseDown={(e) => {
@@ -180,7 +182,7 @@ const Teleprompter = () => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          className="p-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full transition-all cursor-pointer shadow-lg border-2 border-red-800"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white transition duration-200 hover:border-white/20 hover:bg-white/[0.10]"
           style={{
             pointerEvents: 'auto',
             userSelect: 'none',
@@ -192,51 +194,66 @@ const Teleprompter = () => {
         </button>
       </div>
 
-      <div
-        ref={viewportRef}
-        className="flex-1 overflow-hidden relative rounded-2xl border border-white/10 bg-black/40 px-8 py-6"
-      >
+      <div className="relative z-10 flex flex-1 items-center px-8 pb-8 pt-3">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-32 bg-gradient-to-b from-black via-black/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-8 bottom-0 h-40 bg-gradient-to-t from-black via-black/80 to-transparent" />
         <div
-          ref={contentRef}
-          className="text-3xl font-bold leading-relaxed text-center whitespace-pre-wrap no-drag will-change-transform"
-          style={{ transform: `translateY(${offset}px)` }}
+          ref={viewportRef}
+          className="relative mx-auto h-full w-full max-w-5xl overflow-hidden px-8"
         >
-          {text}
+          <div
+            ref={contentRef}
+            className="mx-auto max-w-[18ch] whitespace-pre-wrap text-center text-[clamp(2.5rem,4.8vw,4.5rem)] font-semibold leading-[1.22] tracking-[-0.03em] text-slate-50 no-drag will-change-transform"
+            style={{ transform: `translateY(${offset}px)` }}
+          >
+            {text}
+          </div>
         </div>
       </div>
 
-      {/* Controls */}
       <div
-        className="no-drag flex flex-wrap items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 shadow-lg backdrop-blur-md"
+        className="relative z-10 no-drag mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-[rgba(12,14,18,0.72)] px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-[20px]"
         style={{ pointerEvents: 'auto' }}
       >
-        <button
-          onClick={handlePlay}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
-          title="Reproduzir"
-        >
-          <Play className="w-4 h-4" />
-          Play
-        </button>
-        <button
-          onClick={handlePause}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors"
-          title="Pausar"
-        >
-          <Pause className="w-4 h-4" />
-          Pause
-        </button>
-        <button
-          onClick={handleStop}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors"
-          title="Parar e voltar ao início"
-        >
-          <Square className="w-4 h-4" />
-          Stop
-        </button>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white">
-          <Gauge className="w-4 h-4" />
-          <span className="text-xs text-slate-200">Velocidade</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handlePlay}
+            className={`flex items-center gap-2 rounded-[16px] border px-3 py-2 text-sm font-semibold transition duration-200 ${
+              isRunning
+                ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
+                : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
+            }`}
+            title="Reproduzir"
+          >
+            <Play className="h-4 w-4" />
+            Play
+          </button>
+          <button
+            onClick={handlePause}
+            className={`flex items-center gap-2 rounded-[16px] border px-3 py-2 text-sm font-semibold transition duration-200 ${
+              !isRunning
+                ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
+                : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
+            }`}
+            title="Pausar"
+          >
+            <Pause className="h-4 w-4" />
+            Pause
+          </button>
+          <button
+            onClick={handleStop}
+            className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+            title="Parar e voltar ao início"
+          >
+            <Square className="h-4 w-4" />
+            Reset
+          </button>
+        </div>
+        <div className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-black/20 px-3 py-2 text-sm text-white">
+          <Gauge className="h-4 w-4 text-cyan-200" />
+          <span className="text-xs uppercase tracking-[0.24em] text-slate-400">
+            Ritmo
+          </span>
           <input
             type="range"
             min="0.5"
@@ -244,10 +261,10 @@ const Teleprompter = () => {
             step="0.1"
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className="w-32 accent-purple-400"
+            className="w-32"
             title="Velocidade do texto"
           />
-          <span className="font-semibold w-10 text-right">
+          <span className="font-mono w-10 text-right text-sm font-semibold tracking-[0.08em] text-slate-100">
             {speed.toFixed(1)}x
           </span>
         </div>

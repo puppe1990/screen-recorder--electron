@@ -174,22 +174,23 @@ const PreviewPlayer = ({
     ? Math.min((currentTime / duration) * 100, 100)
     : 0;
   const playbackRates = [0.75, 1, 1.25, 1.5, 2];
+  const controlChipClass =
+    'rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]';
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto p-6"
+      className="fixed inset-0 z-50 overflow-y-auto bg-[rgba(3,5,7,0.88)] p-6 backdrop-blur-md"
       style={{ scrollBehavior: 'smooth' }}
     >
       <div className="min-h-full flex items-center justify-center py-6">
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl border border-slate-700 max-w-5xl w-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-700">
+        <div className="w-full max-w-6xl rounded-[30px] border border-white/8 bg-[linear-gradient(160deg,rgba(12,15,20,0.98),rgba(8,10,15,0.98))] shadow-[0_30px_120px_rgba(0,0,0,0.52)]">
+          <div className="flex items-center justify-between border-b border-white/8 p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-xl">
-                <Video className="w-6 h-6 text-blue-400" />
+              <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2">
+                <Video className="h-6 w-6 text-cyan-200" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-semibold tracking-[-0.02em] text-white">
                   Preview da Gravação
                 </h2>
                 <p className="text-slate-400 text-sm">
@@ -199,75 +200,62 @@ const PreviewPlayer = ({
             </div>
             <button
               onClick={onCancel}
-              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-slate-300 transition duration-200 hover:bg-white/[0.08]"
               title="Fechar"
             >
               <X className="w-5 h-5 text-slate-400" />
             </button>
           </div>
 
-          {/* Video Player */}
-          <div className="p-6 space-y-6">
-            <div className="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center shadow-inner shadow-black/40">
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                className="w-full h-full object-contain"
-                onEnded={handleVideoEnd}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-              />
-            </div>
-
-            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md shadow-black/20">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-slate-300 w-12 text-right">
-                  {formatTime(currentTime)}
-                </span>
-                <div className="flex-1 relative">
-                  <input
-                    type="range"
-                    min={0}
-                    max={duration || 0}
-                    value={duration ? currentTime : 0}
-                    step="0.1"
-                    onChange={(e) => handleSeek(Number(e.target.value))}
-                    className="w-full accent-blue-500"
-                  />
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none"
-                    style={{
-                      background:
-                        'linear-gradient(90deg, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.2) 100%)',
-                      width: `${progressPercent}%`,
-                      height: '4px',
-                      borderRadius: '9999px',
-                    }}
+          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr),320px]">
+            <div className="space-y-5">
+              <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <div className="aspect-video flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_35%),#020304]">
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    className="h-full w-full object-contain"
+                    onEnded={handleVideoEnd}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleLoadedMetadata}
                   />
                 </div>
-                <span className="text-xs font-mono text-slate-400 w-12">
-                  {formatTime(duration || 0)}
-                </span>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md shadow-black/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold">
-                    <Play className="w-4 h-4" />
-                    Controles
+              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-14 text-right font-mono text-xs text-slate-300">
+                    {formatTime(currentTime)}
+                  </span>
+                  <div className="relative flex-1">
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 0}
+                      value={duration ? currentTime : 0}
+                      step="0.1"
+                      onChange={(e) => handleSeek(Number(e.target.value))}
+                      className="relative z-10 w-full bg-transparent"
+                    />
+                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 rounded-full bg-white/10" />
+                    <div
+                      className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-cyan-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
-                  <span className="text-xs text-slate-500">
-                    Navegue pelo preview
+                  <span className="w-14 font-mono text-xs text-slate-400">
+                    {formatTime(duration || 0)}
                   </span>
                 </div>
-                <div className="flex items-center justify-center gap-3">
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] p-2">
                   <button
                     onClick={() => handleSkip(-10)}
-                    className="p-3 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-slate-200 flex items-center gap-2"
+                    className={controlChipClass}
                     title="Voltar 10s"
                   >
                     <Rewind className="w-5 h-5" />
@@ -275,10 +263,10 @@ const PreviewPlayer = ({
                   </button>
                   <button
                     onClick={handlePlayPause}
-                    className={`px-4 py-3 rounded-xl transition-colors flex items-center gap-2 font-semibold ${
+                    className={`rounded-[18px] px-4 py-2 text-sm font-semibold transition duration-200 ${
                       isPlaying
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
+                        ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white shadow-[0_16px_30px_rgba(255,93,115,0.24)]'
+                        : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950 shadow-[0_16px_30px_rgba(110,231,249,0.22)]'
                     }`}
                   >
                     {isPlaying ? (
@@ -295,31 +283,18 @@ const PreviewPlayer = ({
                   </button>
                   <button
                     onClick={() => handleSkip(10)}
-                    className="p-3 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-slate-200 flex items-center gap-2"
+                    className={controlChipClass}
                     title="Avançar 10s"
                   >
                     <span className="text-sm font-semibold">10s</span>
                     <FastForward className="w-5 h-5" />
                   </button>
                 </div>
-              </div>
 
-              <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md shadow-black/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold">
-                    {isMuted || volume === 0 ? (
-                      <VolumeX className="w-4 h-4" />
-                    ) : (
-                      <Volume2 className="w-4 h-4" />
-                    )}
-                    Áudio
-                  </div>
-                  <span className="text-xs text-slate-500">Ajuste volume</span>
-                </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/[0.04] px-3 py-2.5">
                   <button
                     onClick={handleToggleMute}
-                    className="p-3 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-slate-200"
+                    className="rounded-[16px] border border-white/10 bg-white/[0.04] p-2.5 text-slate-200 transition duration-200 hover:bg-white/[0.08]"
                     title={isMuted ? 'Reativar áudio' : 'Silenciar áudio'}
                   >
                     {isMuted || volume === 0 ? (
@@ -335,123 +310,135 @@ const PreviewPlayer = ({
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                    className="flex-1 accent-blue-500"
+                    className="w-32"
                   />
-                  <span className="text-xs font-mono text-slate-300 w-10 text-right">
+                  <span className="w-10 text-right font-mono text-xs text-slate-300">
                     {Math.round((isMuted ? 0 : volume) * 100)}%
                   </span>
                 </div>
-              </div>
 
-              <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md shadow-black/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold">
-                    <Gauge className="w-4 h-4" />
-                    Velocidade e Infos
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    Refine o preview
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.04] px-3 py-2.5">
+                  <Gauge className="h-4 w-4 text-cyan-200" />
                   {playbackRates.map((rate) => (
                     <button
                       key={rate}
                       onClick={() => handleRateChange(rate)}
-                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      className={`rounded-[16px] px-3 py-2 text-sm font-semibold transition duration-200 ${
                         playbackRate === rate
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                          ? 'bg-cyan-300/14 text-cyan-50'
+                          : 'bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
                       }`}
                     >
                       {rate}x
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
-                  <div className="bg-slate-800/60 rounded-lg p-3">
-                    <p className="text-slate-400">Duração</p>
-                    <p className="font-semibold text-white">
-                      {duration ? formatTime(duration) : 'Carregando...'}
-                    </p>
-                  </div>
-                  <div className="bg-slate-800/60 rounded-lg p-3">
-                    <p className="text-slate-400">Resolução</p>
-                    <p className="font-semibold text-white">
-                      {resolution || 'Detectando...'}
-                    </p>
-                  </div>
-                  <div className="bg-slate-800/60 rounded-lg p-3">
-                    <p className="text-slate-400">Tamanho</p>
-                    <p className="font-semibold text-white">{sizeLabel()}</p>
-                  </div>
-                  <div className="bg-slate-800/60 rounded-lg p-3">
-                    <p className="text-slate-400">Formato original</p>
-                    <p className="font-semibold text-white">
-                      {videoBlob.type || 'WebM'}
-                    </p>
-                  </div>
+              </div>
+            </div>
+
+            <aside className="space-y-4">
+              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Exportar
+                </p>
+                <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-white">
+                  Salve a melhor versão
+                </h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  Escolha o formato final depois de revisar imagem, áudio e
+                  ritmo.
+                </p>
+              </div>
+
+              <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-4">
+                <label className="mb-3 block text-sm font-semibold text-slate-300">
+                  Formato de saída
+                </label>
+                <div className="grid grid-cols-1 gap-3">
+                  {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map(
+                    (format) => (
+                      <button
+                        key={format}
+                        onClick={() => setSelectedFormat(format)}
+                        className={`rounded-[20px] border p-4 text-left transition duration-200 ${
+                          selectedFormat === format
+                            ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
+                            : 'border-white/10 bg-black/20 text-slate-300 hover:border-white/18'
+                        }`}
+                      >
+                        <div className="mb-1 font-semibold">
+                          {format === 'webm-vp9' && 'WebM (VP9)'}
+                          {format === 'webm-vp8' && 'WebM (VP8)'}
+                          {format === 'mp4' && 'MP4 (H.264)'}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {format === 'webm-vp9' && 'Melhor qualidade'}
+                          {format === 'webm-vp8' && 'Boa compatibilidade'}
+                          {format === 'mp4' && 'Converte WebM para MP4'}
+                        </div>
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Format Selection */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 shadow-md shadow-black/20">
-              <label className="block text-sm font-semibold text-slate-300 mb-3">
-                Formato de Vídeo para Salvar
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map(
-                  (format) => (
-                    <button
-                      key={format}
-                      onClick={() => setSelectedFormat(format)}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${
-                        selectedFormat === format
-                          ? 'border-blue-500 bg-blue-500/10 text-blue-300 shadow-blue-500/10'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50 text-slate-300'
-                      }`}
-                    >
-                      <div className="font-semibold mb-1">
-                        {format === 'webm-vp9' && 'WebM (VP9)'}
-                        {format === 'webm-vp8' && 'WebM (VP8)'}
-                        {format === 'mp4' && 'MP4 (H.264)'}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {format === 'webm-vp9' && 'Melhor qualidade'}
-                        {format === 'webm-vp8' && 'Boa compatibilidade'}
-                        {format === 'mp4' && 'Converte WebM para MP4'}
-                      </div>
-                    </button>
-                  )
-                )}
+              <div className="grid grid-cols-1 gap-3 text-sm text-slate-300">
+                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    Duração
+                  </p>
+                  <p className="mt-2 font-mono text-base font-semibold text-white">
+                    {duration ? formatTime(duration) : 'Carregando...'}
+                  </p>
+                </div>
+                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    Resolução
+                  </p>
+                  <p className="mt-2 font-semibold text-white">
+                    {resolution || 'Detectando...'}
+                  </p>
+                </div>
+                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    Tamanho
+                  </p>
+                  <p className="mt-2 font-semibold text-white">{sizeLabel()}</p>
+                </div>
+                <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    Origem
+                  </p>
+                  <p className="mt-2 font-semibold text-white">
+                    {videoBlob.type || 'WebM'}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {saveError && (
-              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                {saveError}
+              {saveError && (
+                <div className="rounded-[20px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-3 text-sm text-rose-100">
+                  {saveError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] px-6 text-sm font-bold text-slate-950 shadow-[0_18px_36px_rgba(110,231,249,0.24)] transition duration-200 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Download className="w-5 h-5" />
+                  {isSaving ? 'Salvando...' : 'Salvar vídeo'}
+                </button>
+                <button
+                  onClick={onCancel}
+                  disabled={isSaving}
+                  className="rounded-[18px] border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-white/[0.08]"
+                >
+                  Cancelar
+                </button>
               </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={onCancel}
-                disabled={isSaving}
-                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors text-white font-semibold"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl transition-colors text-white font-semibold flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download className="w-5 h-5" />
-                {isSaving ? 'Salvando...' : 'Salvar Vídeo'}
-              </button>
-            </div>
+            </aside>
           </div>
         </div>
       </div>

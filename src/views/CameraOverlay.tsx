@@ -89,20 +89,30 @@ const CameraOverlay = () => {
 
   return (
     <div
-      className={`w-full h-full flex items-center justify-center overflow-hidden border-4 border-blue-500 bg-black drag-region ${getShapeClass()}`}
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-black drag-region shadow-[0_18px_48px_rgba(0,0,0,0.38)] ring-1 ring-white/10 ${getShapeClass()}`}
     >
       {visibleMessage ? (
-        <div className="flex h-full w-full items-center justify-center bg-slate-950/95 px-6 text-center text-sm text-rose-200">
-          {visibleMessage}
+        <div className="flex h-full w-full items-end justify-start bg-[linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.72))] p-5">
+          <div className="max-w-[78%] rounded-[20px] border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Camera status
+            </p>
+            <p className="mt-2 text-sm font-medium text-slate-100">
+              {visibleMessage}
+            </p>
+          </div>
         </div>
       ) : (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-full object-cover transform scale-x-[-1]"
-        />
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="h-full w-full object-cover transform scale-x-[-1]"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.00),rgba(0,0,0,0.08)_65%,rgba(0,0,0,0.26))]" />
+        </>
       )}
       <style>{`
         .drag-region {
