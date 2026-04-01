@@ -8,13 +8,10 @@ export const IPC_CHANNELS = {
   setCameraSize: 'set-camera-size',
   setTeleprompterText: 'set-teleprompter-text',
   teleprompterTextChanged: 'teleprompter-text-changed',
-  openTeleprompterControl: 'open-teleprompter-control',
   openTeleprompter: 'open-teleprompter',
   closeTeleprompter: 'close-teleprompter',
   toggleTeleprompter: 'toggle-teleprompter',
   saveRecording: 'save-recording',
-  hideControlWindow: 'hide-control-window',
-  showControlWindow: 'show-control-window',
   hideCameraWindow: 'hide-camera-window',
   showCameraWindow: 'show-camera-window',
   showTimer: 'show-timer',
@@ -25,8 +22,6 @@ export const IPC_CHANNELS = {
   startRecordingTrigger: 'start-recording-trigger',
   broadcastRecordingState: 'broadcast-recording-state',
   recordingStateChanged: 'recording-state-changed',
-  showMainPanel: 'show-main-panel',
-  showMiniPanel: 'show-mini-panel',
   resizeMiniPanel: 'resize-mini-panel',
 } as const;
 
@@ -70,7 +65,6 @@ export interface ElectronAPI {
   setTeleprompterText: (text: string) => void;
   onTeleprompterTextChange: (callback: (text: string) => void) => CleanupFn;
   getTeleprompterText: () => Promise<string>;
-  openTeleprompterControl: () => void;
   saveRecording: (
     request: SaveRecordingRequest
   ) => Promise<SaveRecordingResult>;
@@ -78,8 +72,6 @@ export interface ElectronAPI {
   closeTeleprompter: () => void;
   toggleTeleprompter: () => void;
   openTeleprompter: () => void;
-  hideControlWindow: () => void;
-  showControlWindow: () => void;
   hideCameraWindow: () => void;
   showCameraWindow: () => void;
   showTimer: () => void;
@@ -93,7 +85,5 @@ export interface ElectronAPI {
     callback: (isRecording: boolean) => void
   ) => CleanupFn;
   getRecordingState: () => Promise<boolean>;
-  showMainPanel: () => void;
-  showMiniPanel: () => void;
   resizeMiniPanel: (expanded: boolean) => void;
 }

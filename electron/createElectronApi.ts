@@ -45,7 +45,6 @@ export const createElectronApi = (
   onTeleprompterTextChange: (callback) =>
     subscribe(ipc, IPC_CHANNELS.teleprompterTextChanged, callback),
   getTeleprompterText: () => ipc.invoke(IPC_CHANNELS.getTeleprompterText),
-  openTeleprompterControl: () => ipc.send(IPC_CHANNELS.openTeleprompterControl),
   saveRecording: (request: SaveRecordingRequest) =>
     ipc.invoke(IPC_CHANNELS.saveRecording, request),
   setCameraSize: (size: CameraSize) =>
@@ -53,8 +52,6 @@ export const createElectronApi = (
   closeTeleprompter: () => ipc.send(IPC_CHANNELS.closeTeleprompter),
   toggleTeleprompter: () => ipc.send(IPC_CHANNELS.toggleTeleprompter),
   openTeleprompter: () => ipc.send(IPC_CHANNELS.openTeleprompter),
-  hideControlWindow: () => ipc.send(IPC_CHANNELS.hideControlWindow),
-  showControlWindow: () => ipc.send(IPC_CHANNELS.showControlWindow),
   hideCameraWindow: () => ipc.send(IPC_CHANNELS.hideCameraWindow),
   showCameraWindow: () => ipc.send(IPC_CHANNELS.showCameraWindow),
   showTimer: () => ipc.send(IPC_CHANNELS.showTimer),
@@ -70,8 +67,6 @@ export const createElectronApi = (
   onRecordingStateChange: (callback) =>
     subscribe(ipc, IPC_CHANNELS.recordingStateChanged, callback),
   getRecordingState: () => ipc.invoke(IPC_CHANNELS.getRecordingState),
-  showMainPanel: () => ipc.send(IPC_CHANNELS.showMainPanel),
-  showMiniPanel: () => ipc.send(IPC_CHANNELS.showMiniPanel),
   resizeMiniPanel: (expanded: boolean) =>
     ipc.send(IPC_CHANNELS.resizeMiniPanel, expanded),
 });

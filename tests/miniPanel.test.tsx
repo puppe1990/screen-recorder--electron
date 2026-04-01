@@ -20,14 +20,11 @@ const createElectronApiMock = (): ElectronApiWithResize => ({
   setTeleprompterText: vi.fn(),
   onTeleprompterTextChange: vi.fn(() => () => undefined),
   getTeleprompterText: vi.fn().mockResolvedValue(''),
-  openTeleprompterControl: vi.fn(),
   saveRecording: vi.fn(),
   setCameraSize: vi.fn(),
   closeTeleprompter: vi.fn(),
   toggleTeleprompter: vi.fn(),
   openTeleprompter: vi.fn(),
-  hideControlWindow: vi.fn(),
-  showControlWindow: vi.fn(),
   hideCameraWindow: vi.fn(),
   showCameraWindow: vi.fn(),
   showTimer: vi.fn(),
@@ -39,8 +36,6 @@ const createElectronApiMock = (): ElectronApiWithResize => ({
   broadcastRecordingState: vi.fn(),
   onRecordingStateChange: vi.fn(() => () => undefined),
   getRecordingState: vi.fn().mockResolvedValue(false),
-  showMainPanel: vi.fn(),
-  showMiniPanel: vi.fn(),
   resizeMiniPanel: vi.fn(),
 });
 

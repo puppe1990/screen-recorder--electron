@@ -47,12 +47,11 @@ const preloadPath = path.join(__dirname, 'preload.js');
 
 const DEFAULT_TELEPROMPTER_TEXT =
   'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
-const INTERNAL_WINDOW_TITLES = ['studio recorder', 'teleprompter control'];
+const INTERNAL_WINDOW_TITLES = ['studio recorder'];
 
 let cameraWindow: BrowserWindow | null = null;
 let teleprompterWindow: BrowserWindow | null = null;
 let miniPanelWindow: BrowserWindow | null = null;
-let teleprompterControlWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let currentRecordingState = false;
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
@@ -414,40 +413,11 @@ function createTeleprompterWindow() {
   return teleprompterWindow;
 }
 
-function createTeleprompterControlWindow() {
-  if (hasWindow(teleprompterControlWindow)) {
-    showWindow(teleprompterControlWindow);
-    return teleprompterControlWindow;
-  }
-
-  teleprompterControlWindow = new BrowserWindow({
-    width: 700,
-    height: 600,
-    title: 'Teleprompter Control',
-    show: true,
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  teleprompterControlWindow.setContentProtection(true);
-  loadRendererView(teleprompterControlWindow, 'teleprompter-control');
-
-  teleprompterControlWindow.on('closed', () => {
-    teleprompterControlWindow = null;
-  });
-
-  return teleprompterControlWindow;
-}
-
 const listCaptureSources = async (): Promise<DesktopSource[]> => {
   const excludedIds = new Set(
     [
       teleprompterWindow?.getMediaSourceId(),
       miniPanelWindow?.getMediaSourceId(),
-      teleprompterControlWindow?.getMediaSourceId(),
     ].filter((value): value is string => Boolean(value))
   );
 
@@ -587,15 +557,6 @@ const registerIpcHandlers = () => {
       IPC_CHANNELS.teleprompterTextChanged,
       text
     );
-    sendToWindow(
-      teleprompterControlWindow,
-      IPC_CHANNELS.teleprompterTextChanged,
-      text
-    );
-  });
-
-  ipcMain.on(IPC_CHANNELS.openTeleprompterControl, () => {
-    createTeleprompterControlWindow();
   });
 
   ipcMain.on(IPC_CHANNELS.openTeleprompter, () => {
@@ -634,12 +595,6 @@ const registerIpcHandlers = () => {
     }
   );
 
-  ipcMain.on(IPC_CHANNELS.hideControlWindow, () => undefined);
-  ipcMain.on(IPC_CHANNELS.showControlWindow, () => {
-    createMiniPanelWindow();
-    showWindow(miniPanelWindow);
-    resizeMiniPanelWindow(true);
-  });
   ipcMain.on(IPC_CHANNELS.hideCameraWindow, () => hideWindow(cameraWindow));
   ipcMain.on(IPC_CHANNELS.showCameraWindow, () =>
     showWindow(cameraWindow, false)
@@ -674,18 +629,6 @@ const registerIpcHandlers = () => {
 
   ipcMain.on(IPC_CHANNELS.stopRecording, () => {
     sendToWindow(miniPanelWindow, IPC_CHANNELS.stopRecordingTrigger);
-  });
-
-  ipcMain.on(IPC_CHANNELS.showMainPanel, () => {
-    createMiniPanelWindow();
-    showWindow(miniPanelWindow);
-    resizeMiniPanelWindow(true);
-  });
-
-  ipcMain.on(IPC_CHANNELS.showMiniPanel, () => {
-    createMiniPanelWindow();
-    showWindow(miniPanelWindow);
-    resizeMiniPanelWindow(false);
   });
 
   ipcMain.on(IPC_CHANNELS.resizeMiniPanel, (_event, expanded: boolean) => {
