@@ -5,12 +5,10 @@ import {
   Circle,
   Eye,
   EyeOff,
-  GripVertical,
   Monitor,
-  MousePointer2,
   Play,
+  Square,
   StickyNote,
-  Type,
   Video,
   XCircle,
 } from 'lucide-react';
@@ -136,8 +134,25 @@ const createCaptureBundle = async (
   };
 };
 
+const RoundedSquareIcon = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="mx-auto"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="6" ry="6" />
+  </svg>
+);
+
 const MiniPanel = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
   const [sources, setSources] = useState<DesktopSource[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('');
   const [cameraShape, setCameraShape] = useState<CameraShape>('circle');
@@ -157,9 +172,12 @@ const MiniPanel = () => {
     'No macOS, o áudio do sistema pode depender de um driver virtual como BlackHole. O app tenta adicionar o microfone automaticamente.'
   );
   const [seconds, setSeconds] = useState(0);
+  const [isLoadingSources, setIsLoadingSources] = useState(false);
+  const [focusedSourceIndex, setFocusedSourceIndex] = useState(-1);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const cleanupCaptureRef = useRef<(() => void) | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const sourceDropdownRef = useRef<HTMLDivElement>(null);
 
   const isRecording = phase === 'recording';
   const isSaving = phase === 'saving';
@@ -178,6 +196,7 @@ const MiniPanel = () => {
           : 'Pronto';
 
   const loadSources = async () => {
+    setIsLoadingSources(true);
     try {
       const nextSources = await window.electronAPI.getSources();
       setSources(nextSources);
@@ -205,6 +224,42 @@ const MiniPanel = () => {
       setSelectedSourceId('');
       setPhase('error');
       setErrorMessage(message);
+    } finally {
+      setIsLoadingSources(false);
+    }
+  };
+
+  const handleDropdownKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!sourceDropdownOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setSourceDropdownOpen(true);
+        setFocusedSourceIndex(0);
+      }
+      return;
+    }
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedSourceIndex((i) => Math.min(i + 1, sources.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedSourceIndex((i) => Math.max(i - 1, 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (focusedSourceIndex >= 0 && sources[focusedSourceIndex]) {
+          setSelectedSourceId(sources[focusedSourceIndex].id);
+          setSourceDropdownOpen(false);
+          setFocusedSourceIndex(-1);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setSourceDropdownOpen(false);
+        setFocusedSourceIndex(-1);
+        break;
     }
   };
 
@@ -216,6 +271,19 @@ const MiniPanel = () => {
     return () => {
       window.clearTimeout(timerId);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        sourceDropdownRef.current &&
+        !sourceDropdownRef.current.contains(e.target as Node)
+      ) {
+        setSourceDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -564,23 +632,13 @@ const MiniPanel = () => {
           <div
             className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-white/8 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto] py-3'}`}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04] text-slate-400">
-                <GripVertical className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.34em] text-slate-500">
-                  Capture cockpit
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <div
-                    className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-[#FF5D73] shadow-[0_0_14px_rgba(255,93,115,0.95)]' : 'bg-[#8CF0C7] shadow-[0_0_10px_rgba(140,240,199,0.4)]'}`}
-                  />
-                  <p className="truncate text-sm font-semibold text-slate-50">
-                    {statusLabel}
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${isRecording ? 'bg-[#FF5D73] shadow-[0_0_14px_rgba(255,93,115,0.95)]' : 'bg-[#8CF0C7] shadow-[0_0_10px_rgba(140,240,199,0.4)]'}`}
+              />
+              <p className="truncate text-sm font-semibold text-slate-50">
+                {statusLabel}
+              </p>
             </div>
 
             {!isExpanded && (
@@ -623,21 +681,13 @@ const MiniPanel = () => {
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
               <button
-                onClick={() => {
-                  if (!isExpanded) {
-                    setIsExpanded(true);
-                    window.electronAPI.resizeMiniPanel(true);
-                  }
-                }}
-                className="rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs font-semibold text-slate-100 transition hover:border-cyan-300/25 hover:bg-cyan-300/12"
+                onClick={handleToggleExpand}
+                aria-expanded={isExpanded}
+                aria-label={
+                  isExpanded ? 'Ocultar controles' : 'Expandir controles'
+                }
+                className={quietButtonClass}
               >
-                <span className="flex items-center gap-2">
-                  <Type className="h-4 w-4" />
-                  Teleprompter
-                </span>
-              </button>
-
-              <button onClick={handleToggleExpand} className={quietButtonClass}>
                 <span className="flex items-center gap-2">
                   {isExpanded ? (
                     <ChevronUp className="h-4 w-4" />
@@ -647,22 +697,21 @@ const MiniPanel = () => {
                   {isExpanded ? 'Ocultar controles' : 'Expandir controles'}
                 </span>
               </button>
-
-              <button
-                onClick={() => window.electronAPI.resizeMiniPanel(true)}
-                className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3 text-slate-200 transition duration-200 hover:border-white/16 hover:bg-white/[0.08]"
-                title="Expandir este painel"
-              >
-                <Monitor className="h-4 w-4" />
-              </button>
             </div>
 
             {!isExpanded && (
               <button
                 onClick={handleToggleRecording}
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                className={`min-w-[170px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 ${recordingButtonClass}`}
-                title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+                disabled={!isRecording && !selectedSourceId}
+                className={`min-w-[170px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
+                title={
+                  !isRecording && !selectedSourceId
+                    ? 'Selecione uma fonte antes de gravar'
+                    : isRecording
+                      ? 'Parar gravação'
+                      : 'Iniciar gravação'
+                }
               >
                 <span className="flex items-center gap-2">
                   <Video className="h-4 w-4" />
@@ -692,8 +741,15 @@ const MiniPanel = () => {
                 <button
                   onClick={handleToggleRecording}
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition duration-200 ${recordingButtonClass}`}
-                  title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+                  disabled={!isRecording && !selectedSourceId}
+                  className={`w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
+                  title={
+                    !isRecording && !selectedSourceId
+                      ? 'Selecione uma fonte antes de gravar'
+                      : isRecording
+                        ? 'Parar gravação'
+                        : 'Iniciar gravação'
+                  }
                 >
                   <span className="flex items-center justify-center gap-2">
                     <Video className="h-4 w-4" />
@@ -724,39 +780,81 @@ const MiniPanel = () => {
                       </div>
                     </div>
 
-                    <div className="relative">
-                      <select
-                        className="w-full appearance-none rounded-[20px] border border-white/10 bg-black/30 px-4 py-4 pr-12 text-sm text-white outline-none transition duration-200 hover:border-white/18 focus:border-cyan-300"
-                        value={selectedSourceId}
-                        onChange={(event) =>
-                          setSelectedSourceId(event.target.value)
-                        }
+                    <div className="relative" ref={sourceDropdownRef}>
+                      <button
+                        type="button"
+                        id="source-dropdown-trigger"
+                        disabled={isRecording || isSaving}
+                        onClick={() => {
+                          setSourceDropdownOpen((open) => !open);
+                          setFocusedSourceIndex(0);
+                        }}
+                        onKeyDown={handleDropdownKeyDown}
+                        aria-haspopup="listbox"
+                        aria-expanded={sourceDropdownOpen}
+                        aria-label="Selecionar fonte de gravação"
+                        aria-controls="source-dropdown-list"
+                        className="flex w-full items-center justify-between rounded-[20px] border border-white/10 bg-black/30 px-4 py-4 text-sm text-white outline-none transition duration-200 hover:border-white/[0.18] focus-visible:border-cyan-300/50 focus-visible:ring-1 focus-visible:ring-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {sources.length === 0 ? (
-                          <option value="">
-                            {errorMessage
-                              ? 'Nenhuma fonte disponível'
-                              : 'Carregando fontes...'}
-                          </option>
-                        ) : (
-                          sources.map((source) => (
-                            <option key={source.id} value={source.id}>
-                              {source.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <MousePointer2 className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <span className="truncate">
+                          {isLoadingSources
+                            ? 'Carregando fontes...'
+                            : sources.length === 0
+                              ? errorMessage
+                                ? 'Nenhuma fonte disponível'
+                                : 'Nenhuma fonte encontrada'
+                              : selectedSourceName}
+                        </span>
+                        <ChevronDown
+                          className={`ml-3 h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${sourceDropdownOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                      {sourceDropdownOpen && sources.length > 0 && (
+                        <ul
+                          id="source-dropdown-list"
+                          role="listbox"
+                          aria-labelledby="source-dropdown-trigger"
+                          className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-[20px] border border-white/10 bg-[rgba(13,16,22,0.98)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+                        >
+                          {sources.map((source) => (
+                            <li key={source.id} role="presentation">
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={selectedSourceId === source.id}
+                                onClick={() => {
+                                  setSelectedSourceId(source.id);
+                                  setSourceDropdownOpen(false);
+                                  setFocusedSourceIndex(-1);
+                                }}
+                                className={`w-full px-4 py-3.5 text-left text-sm transition duration-150 hover:bg-white/[0.06] ${
+                                  selectedSourceId === source.id
+                                    ? 'bg-cyan-300/[0.08] text-cyan-100'
+                                    : 'text-slate-200'
+                                } ${
+                                  focusedSourceIndex === sources.indexOf(source)
+                                    ? 'outline-none ring-1 ring-inset ring-cyan-300/30'
+                                    : ''
+                                }`}
+                              >
+                                {source.name}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
                         onClick={() => void loadSources()}
-                        disabled={isRecording || isSaving}
+                        disabled={isRecording || isSaving || isLoadingSources}
                         className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 transition duration-200 hover:border-white/18 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Atualizar fontes
+                        {isLoadingSources
+                          ? 'Atualizando...'
+                          : 'Atualizar fontes'}
                       </button>
                     </div>
                   </div>
@@ -836,8 +934,10 @@ const MiniPanel = () => {
                               {shape === 'circle' && (
                                 <Circle className="mx-auto h-4 w-4" />
                               )}
-                              {shape === 'rounded' && 'Arred.'}
-                              {shape === 'square' && 'Quadr.'}
+                              {shape === 'rounded' && <RoundedSquareIcon />}
+                              {shape === 'square' && (
+                                <Square className="mx-auto h-4 w-4" />
+                              )}
                             </button>
                           ))}
                         </div>
@@ -945,26 +1045,24 @@ const MiniPanel = () => {
                       }
                     />
 
-                    <div className="mt-3 flex items-center gap-3 text-xs">
-                      <span
-                        className={`rounded-full border px-2.5 py-1 ${
-                          teleprompterStatus === 'error'
-                            ? 'border-[#FF5D73]/60 text-rose-300'
-                            : teleprompterStatus === 'sync'
-                              ? 'border-cyan-300/60 text-cyan-200'
-                              : 'border-white/10 text-slate-400'
-                        }`}
-                      >
-                        {teleprompterStatus === 'error'
-                          ? 'Erro ao sincronizar'
-                          : teleprompterStatus === 'sync'
-                            ? 'Sincronizando'
-                            : 'Pronto'}
-                      </span>
-                      <span className="text-slate-500">
-                        Atualiza o overlay do teleprompter em tempo real.
-                      </span>
-                    </div>
+                    {teleprompterStatus !== 'idle' && (
+                      <div className="mt-3 flex items-center gap-3 text-xs">
+                        <span
+                          className={`rounded-full border px-2.5 py-1 ${
+                            teleprompterStatus === 'error'
+                              ? 'border-[#FF5D73]/60 text-rose-300'
+                              : 'border-cyan-300/60 text-cyan-200'
+                          }`}
+                        >
+                          {teleprompterStatus === 'error'
+                            ? 'Erro ao sincronizar'
+                            : 'Sincronizando'}
+                        </span>
+                        <span className="text-slate-500">
+                          Atualiza o overlay do teleprompter em tempo real.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </aside>
               </div>

@@ -9,8 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-electron
 dist-ssr
 *.local
+.claude
+CLAUDE.md
 
 # Editor directories and files
 .vscode/*

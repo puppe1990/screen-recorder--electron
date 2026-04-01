@@ -12,6 +12,7 @@ const Teleprompter = () => {
   const [isRunning, setIsRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [offset, setOffset] = useState(0);
+  const [scrollDistance, setScrollDistance] = useState(0);
   const [viewportVersion, setViewportVersion] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -31,6 +32,11 @@ const Teleprompter = () => {
       MAX_SCROLL_SECONDS
     );
   }, [text, speed]);
+
+  const scrollProgressPercent = useMemo(() => {
+    if (scrollDistance === 0) return 100;
+    return Math.min(Math.round((Math.abs(offset) / scrollDistance) * 100), 100);
+  }, [offset, scrollDistance]);
 
   useEffect(() => {
     let isMounted = true;
@@ -95,13 +101,31 @@ const Teleprompter = () => {
     const target = viewportRef.current;
     if (!target) return;
 
-    const observer = new ResizeObserver(() => {
+    const handleResize = () => {
       setViewportVersion((v) => v + 1);
+    };
+
+    const observer = new ResizeObserver(() => {
+      handleResize();
     });
     observer.observe(target);
+    window.addEventListener('resize', handleResize);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    setScrollDistance(
+      Math.max(0, content.scrollHeight - viewport.clientHeight)
+    );
+  }, [text, viewportVersion]);
 
   // Anima a rolagem com base em pixels para evitar saltos de velocidade em textos longos/curtos
   useEffect(() => {
@@ -112,9 +136,9 @@ const Teleprompter = () => {
     const viewportHeight = viewport.clientHeight;
     const contentHeight = content.scrollHeight;
     const distance = Math.max(0, contentHeight - viewportHeight);
+    setScrollDistance(distance);
 
     if (distance === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOffsetValue(0);
       return;
     }
@@ -211,6 +235,18 @@ const Teleprompter = () => {
         </div>
       </div>
 
+      <div className="relative z-10 no-drag mx-5 mb-2 h-1 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-cyan-400/70 transition-none"
+          style={{ width: `${scrollProgressPercent}%` }}
+          role="progressbar"
+          aria-valuenow={scrollProgressPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Progresso da rolagem"
+        />
+      </div>
+
       <div
         className="relative z-10 no-drag mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-[rgba(12,14,18,0.72)] px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-[20px]"
         style={{ pointerEvents: 'auto' }}
@@ -261,11 +297,15 @@ const Teleprompter = () => {
             step="0.1"
             value={speed}
             onChange={(e) => setSpeed(Number(e.target.value))}
-            className="w-32"
+            aria-label="Velocidade de rolagem"
             title="Velocidade do texto"
+            className="w-32"
           />
           <span className="font-mono w-10 text-right text-sm font-semibold tracking-[0.08em] text-slate-100">
             {speed.toFixed(1)}x
+          </span>
+          <span className="text-xs text-slate-500" title="Duração estimada">
+            ~{Math.round(duration)}s
           </span>
         </div>
       </div>

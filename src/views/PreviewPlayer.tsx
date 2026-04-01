@@ -38,6 +38,7 @@ const PreviewPlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [resolution, setResolution] = useState('');
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const videoUrl = useMemo(() => URL.createObjectURL(videoBlob), [videoBlob]);
 
   useEffect(() => {
@@ -58,6 +59,16 @@ const PreviewPlayer = ({
       videoRef.current.playbackRate = playbackRate;
     }
   }, [playbackRate]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSaving) {
+        setShowDiscardConfirm(true);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSaving]);
 
   const formatTime = (seconds: number) => {
     if (!Number.isFinite(seconds)) return '00:00';
@@ -109,6 +120,11 @@ const PreviewPlayer = ({
 
   const handleVideoEnd = () => {
     setIsPlaying(false);
+  };
+
+  const handleCancel = () => {
+    if (isSaving) return;
+    setShowDiscardConfirm(true);
   };
 
   const handleSave = async () => {
@@ -199,9 +215,10 @@ const PreviewPlayer = ({
               </div>
             </div>
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-slate-300 transition duration-200 hover:bg-white/[0.08]"
-              title="Fechar"
+              title="Fechar preview (ESC)"
+              aria-label="Fechar preview"
             >
               <X className="w-5 h-5 text-slate-400" />
             </button>
@@ -237,6 +254,11 @@ const PreviewPlayer = ({
                       value={duration ? currentTime : 0}
                       step="0.1"
                       onChange={(e) => handleSeek(Number(e.target.value))}
+                      aria-label="Posição do vídeo"
+                      aria-valuemin={0}
+                      aria-valuemax={duration || 0}
+                      aria-valuenow={currentTime}
+                      aria-valuetext={formatTime(currentTime)}
                       className="relative z-10 w-full bg-transparent"
                     />
                     <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 rounded-full bg-white/10" />
@@ -276,8 +298,8 @@ const PreviewPlayer = ({
                       </>
                     ) : (
                       <>
-                        <Play className="w-5 h-5 text-white" />
-                        <span className="text-white">Reproduzir</span>
+                        <Play className="w-5 h-5" />
+                        <span>Reproduzir</span>
                       </>
                     )}
                   </button>
@@ -310,6 +332,7 @@ const PreviewPlayer = ({
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                    aria-label="Volume"
                     className="w-32"
                   />
                   <span className="w-10 text-right font-mono text-xs text-slate-300">
@@ -372,9 +395,12 @@ const PreviewPlayer = ({
                           {format === 'mp4' && 'MP4 (H.264)'}
                         </div>
                         <div className="text-xs text-slate-400">
-                          {format === 'webm-vp9' && 'Melhor qualidade'}
-                          {format === 'webm-vp8' && 'Boa compatibilidade'}
-                          {format === 'mp4' && 'Converte WebM para MP4'}
+                          {format === 'webm-vp9' &&
+                            'Melhor qualidade, salva rápido'}
+                          {format === 'webm-vp8' &&
+                            'Boa compatibilidade com navegadores'}
+                          {format === 'mp4' &&
+                            'Compatível com tudo — requer conversão via FFmpeg (demora mais)'}
                         </div>
                       </button>
                     )
@@ -428,20 +454,61 @@ const PreviewPlayer = ({
                   className="flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] px-6 text-sm font-bold text-slate-950 shadow-[0_18px_36px_rgba(110,231,249,0.24)] transition duration-200 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Download className="w-5 h-5" />
-                  {isSaving ? 'Salvando...' : 'Salvar vídeo'}
+                  {isSaving
+                    ? `Salvando${selectedFormat === 'mp4' ? ' (convertendo...)' : '...'}`
+                    : `Salvar como ${selectedFormat === 'webm-vp9' ? 'WebM VP9' : selectedFormat === 'webm-vp8' ? 'WebM VP8' : 'MP4'}`}
                 </button>
                 <button
-                  onClick={onCancel}
+                  onClick={handleCancel}
                   disabled={isSaving}
                   className="rounded-[18px] border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-white/[0.08]"
                 >
-                  Cancelar
+                  {isSaving ? 'Salvando...' : 'Descartar gravação'}
                 </button>
               </div>
             </aside>
           </div>
         </div>
       </div>
+      {showDiscardConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="discard-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-[24px] border border-white/10 bg-[rgba(12,15,20,0.98)] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
+            <h3
+              id="discard-dialog-title"
+              className="text-lg font-semibold text-white"
+            >
+              Descartar gravação?
+            </h3>
+            <p className="mt-2 text-sm text-slate-400">
+              A gravação não foi salva. Se sair agora, ela será perdida
+              permanentemente.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDiscardConfirm(false);
+                  onCancel();
+                }}
+                className="flex-1 rounded-[16px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-3 text-sm font-semibold text-rose-100 transition duration-200 hover:bg-[#FF5D73]/16"
+              >
+                Descartar
+              </button>
+              <button
+                onClick={() => setShowDiscardConfirm(false)}
+                autoFocus
+                className="flex-1 rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-white/[0.10]"
+              >
+                Continuar editando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
