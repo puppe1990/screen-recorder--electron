@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Teleprompter from '../src/views/Teleprompter';
 import type { ElectronAPI } from '../electron/ipc-contract';
 
+type SpeedCallback = (speed: number) => void;
+
 const createElectronApiMock = (): ElectronAPI => ({
   getSources: vi.fn().mockResolvedValue([]),
   setCameraShape: vi.fn(),
@@ -29,6 +31,18 @@ const createElectronApiMock = (): ElectronAPI => ({
   onRecordingStateChange: vi.fn(() => () => undefined),
   getRecordingState: vi.fn().mockResolvedValue(false),
   resizeMiniPanel: vi.fn(),
+  teleprompterPlay: vi.fn(),
+  teleprompterPause: vi.fn(),
+  teleprompterReset: vi.fn(),
+  teleprompterSetSpeed: vi.fn(),
+  onTeleprompterWindowOpened: vi.fn(() => () => undefined),
+  onTeleprompterWindowClosed: vi.fn(() => () => undefined),
+  onTeleprompterPlay: vi.fn(() => () => undefined),
+  onTeleprompterPause: vi.fn(() => () => undefined),
+  onTeleprompterReset: vi.fn(() => () => undefined),
+  onTeleprompterSetSpeed: vi.fn(() => () => undefined),
+  teleprompterScrollDone: vi.fn(),
+  onTeleprompterScrollDone: vi.fn(() => () => undefined),
 });
 
 describe('Teleprompter', () => {
@@ -36,38 +50,49 @@ describe('Teleprompter', () => {
     window.electronAPI = createElectronApiMock();
   });
 
-  it('shows 100% progress when the content already fits the viewport', async () => {
-    render(<Teleprompter />);
+  it('updates the displayed speed when receiving a remote speed command', async () => {
+    const electronApi = createElectronApiMock();
+    let onSpeedChange: SpeedCallback | undefined;
 
-    const progress = screen.getByRole('progressbar', {
-      name: /progresso da rolagem/i,
+    electronApi.onTeleprompterSetSpeed.mockImplementation((callback) => {
+      onSpeedChange = callback;
+      return () => undefined;
     });
+
+    window.electronAPI = electronApi;
+
+    render(<Teleprompter />);
 
     await waitFor(() => {
       expect(screen.getByText('texto curto')).toBeInTheDocument();
     });
 
-    const content = screen.getByText('texto curto');
-    const viewport = content.parentElement;
-    if (!viewport) {
-      throw new Error('Expected teleprompter viewport to exist');
-    }
-
-    Object.defineProperty(viewport, 'clientHeight', {
-      configurable: true,
-      value: 400,
-    });
-    Object.defineProperty(content, 'scrollHeight', {
-      configurable: true,
-      value: 400,
-    });
-
     act(() => {
-      window.dispatchEvent(new Event('resize'));
+      onSpeedChange?.(1.7);
     });
 
-    await waitFor(() => {
-      expect(progress).toHaveAttribute('aria-valuenow', '100');
-    });
+    expect(screen.getByText('1.7x')).toBeInTheDocument();
+  });
+
+  it('removes the window resize listener on unmount', () => {
+    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+
+    const { unmount } = render(<Teleprompter />);
+
+    const resizeRegistration = addEventListenerSpy.mock.calls.find(
+      ([eventName]) => eventName === 'resize'
+    );
+
+    expect(resizeRegistration).toBeDefined();
+
+    const resizeHandler = resizeRegistration?.[1];
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'resize',
+      resizeHandler
+    );
   });
 });

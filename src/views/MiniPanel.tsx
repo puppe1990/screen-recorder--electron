@@ -6,7 +6,9 @@ import {
   Eye,
   EyeOff,
   Monitor,
+  Pause,
   Play,
+  RotateCcw,
   Square,
   StickyNote,
   Video,
@@ -158,11 +160,15 @@ const MiniPanel = () => {
   const [cameraShape, setCameraShape] = useState<CameraShape>('circle');
   const [cameraSize, setCameraSize] = useState<CameraSize>('medium');
   const [cameraVisible, setCameraVisible] = useState(true);
-  const [videoFormat, setVideoFormat] = useState<VideoFormat>('webm-vp9');
+  const [videoFormat, setVideoFormat] = useState<VideoFormat>('mp4');
   const [teleprompterText, setTeleprompterText] = useState('');
   const [teleprompterStatus, setTeleprompterStatus] = useState<
     'idle' | 'sync' | 'error'
   >('idle');
+  const [teleprompterIsOpen, setTeleprompterIsOpen] = useState(false);
+  const [teleprompterIsRunning, setTeleprompterIsRunning] = useState(false);
+  const [teleprompterIsDone, setTeleprompterIsDone] = useState(false);
+  const [teleprompterSpeed, setTeleprompterSpeed] = useState(1);
   const [phase, setPhase] = useState<PanelPhase>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -178,6 +184,7 @@ const MiniPanel = () => {
   const cleanupCaptureRef = useRef<(() => void) | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const sourceDropdownRef = useRef<HTMLDivElement>(null);
+  const teleprompterSpeedRef = useRef(1);
 
   const isRecording = phase === 'recording';
   const isSaving = phase === 'saving';
@@ -326,6 +333,32 @@ const MiniPanel = () => {
     return () => {
       active = false;
       cleanup();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubOpened = window.electronAPI.onTeleprompterWindowOpened(() => {
+      setTeleprompterIsOpen(true);
+      setTeleprompterIsRunning(true);
+      setTeleprompterIsDone(false);
+      window.electronAPI.teleprompterSetSpeed(teleprompterSpeedRef.current);
+    });
+
+    const unsubClosed = window.electronAPI.onTeleprompterWindowClosed(() => {
+      setTeleprompterIsOpen(false);
+      setTeleprompterIsRunning(false);
+      setTeleprompterIsDone(false);
+    });
+
+    const unsubDone = window.electronAPI.onTeleprompterScrollDone(() => {
+      setTeleprompterIsRunning(false);
+      setTeleprompterIsDone(true);
+    });
+
+    return () => {
+      unsubOpened();
+      unsubClosed();
+      unsubDone();
     };
   }, []);
 
@@ -565,6 +598,46 @@ const MiniPanel = () => {
     }
   };
 
+  const handleTeleprompterToggle = () => {
+    if (teleprompterIsOpen) {
+      window.electronAPI.closeTeleprompter();
+    } else {
+      window.electronAPI.openTeleprompter();
+    }
+  };
+
+  const handleTeleprompterPlay = () => {
+    setTeleprompterIsRunning(true);
+    setTeleprompterIsDone(false);
+    window.electronAPI.teleprompterPlay();
+  };
+
+  const handleTeleprompterPause = () => {
+    setTeleprompterIsRunning(false);
+    window.electronAPI.teleprompterPause();
+  };
+
+  // Stop = pause + go to beginning
+  const handleTeleprompterStop = () => {
+    setTeleprompterIsRunning(false);
+    setTeleprompterIsDone(false);
+    window.electronAPI.teleprompterReset();
+  };
+
+  // Restart = go to beginning + auto-play
+  const handleTeleprompterRestart = () => {
+    setTeleprompterIsRunning(true);
+    setTeleprompterIsDone(false);
+    window.electronAPI.teleprompterReset();
+    window.electronAPI.teleprompterPlay();
+  };
+
+  const handleTeleprompterSpeedChange = (value: number) => {
+    teleprompterSpeedRef.current = value;
+    setTeleprompterSpeed(value);
+    window.electronAPI.teleprompterSetSpeed(value);
+  };
+
   function stopRecording() {
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
@@ -632,7 +705,7 @@ const MiniPanel = () => {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.10),transparent_60%)]" />
 
           <div
-            className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-white/8 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto] py-3'}`}
+            className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-white/8 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto,auto] py-3'}`}
           >
             <div className="flex items-center gap-2">
               <div
@@ -703,10 +776,32 @@ const MiniPanel = () => {
 
             {!isExpanded && (
               <button
+                onClick={handleTeleprompterToggle}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                className={`rounded-[20px] px-4 py-3.5 text-sm font-semibold transition duration-200 ${
+                  teleprompterIsOpen
+                    ? 'border border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
+                    : 'border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
+                }`}
+                title={
+                  teleprompterIsOpen
+                    ? 'Fechar teleprompter'
+                    : 'Abrir teleprompter'
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  Script
+                </span>
+              </button>
+            )}
+
+            {!isExpanded && (
+              <button
                 onClick={handleToggleRecording}
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 disabled={!isRecording && !selectedSourceId}
-                className={`min-w-[170px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
+                className={`min-w-[150px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
                 title={
                   !isRecording && !selectedSourceId
                     ? 'Selecione uma fonte antes de gravar'
@@ -760,7 +855,7 @@ const MiniPanel = () => {
                 </button>
               </div>
 
-              <div className="grid flex-1 grid-cols-1 gap-4 overflow-auto border-t border-white/8 px-4 py-4 xl:grid-cols-[1.15fr_0.85fr]">
+              <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 overflow-auto border-t border-white/8 px-4 py-4 xl:grid-cols-[1.15fr_0.85fr]">
                 <section className="space-y-4">
                   <div
                     className={sectionCardClass}
@@ -1003,44 +1098,131 @@ const MiniPanel = () => {
                       { WebkitAppRegion: 'no-drag' } as React.CSSProperties
                     }
                   >
+                    {/* Header */}
                     <div className="mb-4 flex items-center gap-3">
                       <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-200">
                         <StickyNote className="h-5 w-5" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <h2 className="text-lg font-semibold text-white">
                           Teleprompter
                         </h2>
-                        <p className="text-sm text-slate-400">
-                          Edite o roteiro e controle a janela daqui.
-                        </p>
+                      </div>
+                      {/* Status badge */}
+                      {teleprompterIsOpen &&
+                        (teleprompterIsDone ? (
+                          <span className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+                            Concluído
+                          </span>
+                        ) : teleprompterIsRunning ? (
+                          <span className="flex items-center gap-1.5 rounded-full border border-green-400/40 bg-green-400/10 px-2.5 py-1 text-xs font-semibold text-green-300">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                            Ao vivo
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-400">
+                            Pausado
+                          </span>
+                        ))}
+                      {/* Open / Close toggle — always clickable, lives in header */}
+                      <button
+                        onClick={handleTeleprompterToggle}
+                        className={`rounded-[14px] border px-3 py-2 text-xs font-semibold transition duration-200 ${
+                          teleprompterIsOpen
+                            ? 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
+                            : 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50 hover:bg-cyan-300/20'
+                        }`}
+                        title={
+                          teleprompterIsOpen ? 'Fechar janela' : 'Abrir janela'
+                        }
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {teleprompterIsOpen ? (
+                            <XCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <Play className="h-3.5 w-3.5" />
+                          )}
+                          {teleprompterIsOpen ? 'Fechar' : 'Abrir'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Playback controls — dimmed when window closed, but pointer-events still blocked */}
+                    <div
+                      className={`mb-4 space-y-3 transition-opacity duration-200 ${teleprompterIsOpen ? 'opacity-100' : 'pointer-events-none opacity-30'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* Start / Pause */}
+                        <button
+                          onClick={
+                            teleprompterIsRunning
+                              ? handleTeleprompterPause
+                              : handleTeleprompterPlay
+                          }
+                          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-cyan-300/25 bg-cyan-300/14 py-2.5 text-xs font-semibold text-cyan-50 transition duration-200 hover:bg-cyan-300/20"
+                          title={
+                            teleprompterIsRunning
+                              ? 'Pausar (Space)'
+                              : 'Iniciar (Space)'
+                          }
+                        >
+                          {teleprompterIsRunning ? (
+                            <Pause className="h-3.5 w-3.5" />
+                          ) : (
+                            <Play className="h-3.5 w-3.5" />
+                          )}
+                          {teleprompterIsRunning ? 'Pausar' : 'Iniciar'}
+                        </button>
+
+                        {/* Restart */}
+                        <button
+                          onClick={handleTeleprompterRestart}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+                          title="Reiniciar do início"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Reiniciar
+                        </button>
+
+                        {/* Stop */}
+                        <button
+                          onClick={handleTeleprompterStop}
+                          className="flex h-9 w-9 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.04] text-slate-400 transition duration-200 hover:bg-white/[0.08] hover:text-slate-200"
+                          title="Parar e voltar ao início"
+                        >
+                          <Square className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Speed */}
+                      <div className="flex items-center gap-3 rounded-[14px] border border-white/8 bg-black/20 px-3 py-2">
+                        <span className="text-xs text-slate-400">
+                          Velocidade
+                        </span>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.1"
+                          value={teleprompterSpeed}
+                          onChange={(e) =>
+                            handleTeleprompterSpeedChange(
+                              Number(e.target.value)
+                            )
+                          }
+                          className="flex-1"
+                          aria-label="Velocidade do teleprompter"
+                        />
+                        <span className="w-8 text-right font-mono text-xs font-semibold text-slate-200">
+                          {teleprompterSpeed.toFixed(1)}x
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => window.electronAPI.openTeleprompter()}
-                        className="rounded-[18px] border border-cyan-300/25 bg-cyan-300/14 px-3 py-2.5 text-xs font-semibold text-cyan-50 transition duration-200 hover:bg-cyan-300/18"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Play className="h-4 w-4" />
-                          Abrir
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => window.electronAPI.closeTeleprompter()}
-                        className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-semibold text-slate-200 transition duration-200 hover:border-white/18 hover:bg-white/[0.08]"
-                      >
-                        <span className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4" />
-                          Fechar
-                        </span>
-                      </button>
-                    </div>
-
+                    {/* Script textarea */}
                     <textarea
-                      className="mt-4 h-52 w-full rounded-[24px] border border-white/10 bg-black/25 px-5 py-4 text-sm leading-relaxed text-white outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300"
-                      placeholder="Cole ou escreva o texto do teleprompter..."
+                      className="h-36 w-full rounded-[20px] border border-white/10 bg-black/25 px-4 py-3 text-sm leading-relaxed text-white outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300/50"
+                      placeholder="Cole ou escreva o roteiro aqui..."
                       value={teleprompterText}
                       onChange={(event) =>
                         handleTeleprompterTextChange(event.target.value)
@@ -1048,22 +1230,13 @@ const MiniPanel = () => {
                     />
 
                     {teleprompterStatus !== 'idle' && (
-                      <div className="mt-3 flex items-center gap-3 text-xs">
-                        <span
-                          className={`rounded-full border px-2.5 py-1 ${
-                            teleprompterStatus === 'error'
-                              ? 'border-[#FF5D73]/60 text-rose-300'
-                              : 'border-cyan-300/60 text-cyan-200'
-                          }`}
-                        >
-                          {teleprompterStatus === 'error'
-                            ? 'Erro ao sincronizar'
-                            : 'Sincronizando'}
-                        </span>
-                        <span className="text-slate-500">
-                          Atualiza o overlay do teleprompter em tempo real.
-                        </span>
-                      </div>
+                      <p
+                        className={`mt-2 text-xs ${teleprompterStatus === 'error' ? 'text-rose-400' : 'text-cyan-400/70'}`}
+                      >
+                        {teleprompterStatus === 'error'
+                          ? 'Erro ao sincronizar'
+                          : 'Sincronizado'}
+                      </p>
                     )}
                   </div>
                 </aside>

@@ -1,5 +1,11 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MiniPanel from '../src/views/MiniPanel';
@@ -8,6 +14,8 @@ import type { ElectronAPI } from '../electron/ipc-contract';
 type ElectronApiWithResize = ElectronAPI & {
   resizeMiniPanel: ReturnType<typeof vi.fn>;
 };
+
+type TeleprompterCallback = () => void;
 
 const createElectronApiMock = (): ElectronApiWithResize => ({
   getSources: vi.fn().mockResolvedValue([
@@ -37,6 +45,18 @@ const createElectronApiMock = (): ElectronApiWithResize => ({
   onRecordingStateChange: vi.fn(() => () => undefined),
   getRecordingState: vi.fn().mockResolvedValue(false),
   resizeMiniPanel: vi.fn(),
+  teleprompterPlay: vi.fn(),
+  teleprompterPause: vi.fn(),
+  teleprompterReset: vi.fn(),
+  teleprompterSetSpeed: vi.fn(),
+  onTeleprompterWindowOpened: vi.fn(() => () => undefined),
+  onTeleprompterWindowClosed: vi.fn(() => () => undefined),
+  onTeleprompterPlay: vi.fn(() => () => undefined),
+  onTeleprompterPause: vi.fn(() => () => undefined),
+  onTeleprompterReset: vi.fn(() => () => undefined),
+  onTeleprompterSetSpeed: vi.fn(() => () => undefined),
+  teleprompterScrollDone: vi.fn(),
+  onTeleprompterScrollDone: vi.fn(() => () => undefined),
 });
 
 describe('MiniPanel', () => {
@@ -76,5 +96,36 @@ describe('MiniPanel', () => {
     expect(
       (window.electronAPI as ElectronApiWithResize).resizeMiniPanel
     ).toHaveBeenCalledWith(true);
+  });
+
+  it('sends the latest speed when the teleprompter window opens', async () => {
+    const user = userEvent.setup();
+    const electronApi = createElectronApiMock();
+    let onWindowOpened: TeleprompterCallback | undefined;
+
+    electronApi.onTeleprompterWindowOpened.mockImplementation((callback) => {
+      onWindowOpened = callback;
+      return () => undefined;
+    });
+
+    window.electronAPI = electronApi;
+
+    render(<MiniPanel />);
+
+    await user.click(
+      screen.getByRole('button', { name: /expandir controles/i })
+    );
+
+    const speedSlider = await screen.findByRole('slider', {
+      name: /velocidade do teleprompter/i,
+    });
+
+    fireEvent.change(speedSlider, { target: { value: '1.7' } });
+
+    act(() => {
+      onWindowOpened?.();
+    });
+
+    expect(electronApi.teleprompterSetSpeed).toHaveBeenLastCalledWith(1.7);
   });
 });

@@ -56,7 +56,7 @@ let tray: Tray | null = null;
 let currentRecordingState = false;
 let teleprompterText = DEFAULT_TELEPROMPTER_TEXT;
 let cameraStatusMessage: string | null = null;
-const MINI_PANEL_COLLAPSED = { width: 680, height: 100 };
+const MINI_PANEL_COLLAPSED = { width: 800, height: 100 };
 const MINI_PANEL_EXPANDED = { width: 960, height: 620 };
 
 const hasWindow = (window: BrowserWindow | null): window is BrowserWindow =>
@@ -375,6 +375,7 @@ function createTeleprompterWindow() {
       IPC_CHANNELS.teleprompterTextChanged,
       teleprompterText
     );
+    sendToWindow(miniPanelWindow, IPC_CHANNELS.teleprompterWindowOpened);
     return teleprompterWindow;
   }
 
@@ -408,6 +409,11 @@ function createTeleprompterWindow() {
 
   teleprompterWindow.on('closed', () => {
     teleprompterWindow = null;
+    sendToWindow(miniPanelWindow, IPC_CHANNELS.teleprompterWindowClosed);
+  });
+
+  teleprompterWindow.webContents.once('did-finish-load', () => {
+    sendToWindow(miniPanelWindow, IPC_CHANNELS.teleprompterWindowOpened);
   });
 
   return teleprompterWindow;
@@ -633,6 +639,26 @@ const registerIpcHandlers = () => {
 
   ipcMain.on(IPC_CHANNELS.resizeMiniPanel, (_event, expanded: boolean) => {
     resizeMiniPanelWindow(expanded);
+  });
+
+  ipcMain.on(IPC_CHANNELS.teleprompterPlay, () => {
+    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterPlay);
+  });
+
+  ipcMain.on(IPC_CHANNELS.teleprompterPause, () => {
+    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterPause);
+  });
+
+  ipcMain.on(IPC_CHANNELS.teleprompterReset, () => {
+    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterReset);
+  });
+
+  ipcMain.on(IPC_CHANNELS.teleprompterSetSpeed, (_event, speed: number) => {
+    sendToWindow(teleprompterWindow, IPC_CHANNELS.teleprompterSetSpeed, speed);
+  });
+
+  ipcMain.on(IPC_CHANNELS.teleprompterScrollDone, () => {
+    sendToWindow(miniPanelWindow, IPC_CHANNELS.teleprompterScrollDone);
   });
 };
 

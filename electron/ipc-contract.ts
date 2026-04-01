@@ -23,6 +23,13 @@ export const IPC_CHANNELS = {
   broadcastRecordingState: 'broadcast-recording-state',
   recordingStateChanged: 'recording-state-changed',
   resizeMiniPanel: 'resize-mini-panel',
+  teleprompterPlay: 'teleprompter-play',
+  teleprompterPause: 'teleprompter-pause',
+  teleprompterReset: 'teleprompter-reset',
+  teleprompterSetSpeed: 'teleprompter-set-speed',
+  teleprompterWindowOpened: 'teleprompter-window-opened',
+  teleprompterWindowClosed: 'teleprompter-window-closed',
+  teleprompterScrollDone: 'teleprompter-scroll-done',
 } as const;
 
 export type CleanupFn = () => void;
@@ -86,4 +93,16 @@ export interface ElectronAPI {
   ) => CleanupFn;
   getRecordingState: () => Promise<boolean>;
   resizeMiniPanel: (expanded: boolean) => void;
+  teleprompterPlay: () => void;
+  teleprompterPause: () => void;
+  teleprompterReset: () => void;
+  teleprompterSetSpeed: (speed: number) => void;
+  onTeleprompterWindowOpened: (callback: () => void) => CleanupFn;
+  onTeleprompterWindowClosed: (callback: () => void) => CleanupFn;
+  onTeleprompterPlay: (callback: () => void) => CleanupFn;
+  onTeleprompterPause: (callback: () => void) => CleanupFn;
+  onTeleprompterReset: (callback: () => void) => CleanupFn;
+  onTeleprompterSetSpeed: (callback: (speed: number) => void) => CleanupFn;
+  teleprompterScrollDone: () => void;
+  onTeleprompterScrollDone: (callback: () => void) => CleanupFn;
 }

@@ -60,6 +60,18 @@ interface ElectronAPI {
   ) => CleanupFn;
   getRecordingState: () => Promise<boolean>;
   resizeMiniPanel: (expanded: boolean) => void;
+  teleprompterPlay: () => void;
+  teleprompterPause: () => void;
+  teleprompterReset: () => void;
+  teleprompterSetSpeed: (speed: number) => void;
+  onTeleprompterWindowOpened: (callback: () => void) => CleanupFn;
+  onTeleprompterWindowClosed: (callback: () => void) => CleanupFn;
+  onTeleprompterPlay: (callback: () => void) => CleanupFn;
+  onTeleprompterPause: (callback: () => void) => CleanupFn;
+  onTeleprompterReset: (callback: () => void) => CleanupFn;
+  onTeleprompterSetSpeed: (callback: (speed: number) => void) => CleanupFn;
+  teleprompterScrollDone: () => void;
+  onTeleprompterScrollDone: (callback: () => void) => CleanupFn;
 }
 
 const IPC_CHANNELS = {
@@ -87,6 +99,13 @@ const IPC_CHANNELS = {
   broadcastRecordingState: 'broadcast-recording-state',
   recordingStateChanged: 'recording-state-changed',
   resizeMiniPanel: 'resize-mini-panel',
+  teleprompterPlay: 'teleprompter-play',
+  teleprompterPause: 'teleprompter-pause',
+  teleprompterReset: 'teleprompter-reset',
+  teleprompterSetSpeed: 'teleprompter-set-speed',
+  teleprompterWindowOpened: 'teleprompter-window-opened',
+  teleprompterWindowClosed: 'teleprompter-window-closed',
+  teleprompterScrollDone: 'teleprompter-scroll-done',
 } as const;
 
 const subscribe = <T>(channel: string, callback: (value: T) => void) => {
@@ -139,6 +158,27 @@ const electronAPI: ElectronAPI = {
   getRecordingState: () => ipcRenderer.invoke(IPC_CHANNELS.getRecordingState),
   resizeMiniPanel: (expanded: boolean) =>
     ipcRenderer.send(IPC_CHANNELS.resizeMiniPanel, expanded),
+  teleprompterPlay: () => ipcRenderer.send(IPC_CHANNELS.teleprompterPlay),
+  teleprompterPause: () => ipcRenderer.send(IPC_CHANNELS.teleprompterPause),
+  teleprompterReset: () => ipcRenderer.send(IPC_CHANNELS.teleprompterReset),
+  teleprompterSetSpeed: (speed: number) =>
+    ipcRenderer.send(IPC_CHANNELS.teleprompterSetSpeed, speed),
+  onTeleprompterWindowOpened: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterWindowOpened, callback),
+  onTeleprompterWindowClosed: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterWindowClosed, callback),
+  onTeleprompterPlay: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterPlay, callback),
+  onTeleprompterPause: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterPause, callback),
+  onTeleprompterReset: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterReset, callback),
+  onTeleprompterSetSpeed: (callback) =>
+    subscribe(IPC_CHANNELS.teleprompterSetSpeed, callback),
+  teleprompterScrollDone: () =>
+    ipcRenderer.send(IPC_CHANNELS.teleprompterScrollDone),
+  onTeleprompterScrollDone: (callback) =>
+    subscribeVoid(IPC_CHANNELS.teleprompterScrollDone, callback),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

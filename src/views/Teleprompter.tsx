@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Gauge, Pause, Play, Square, X } from 'lucide-react';
+import { Gauge, Pause, Play, RotateCcw, Square } from 'lucide-react';
 
 const DEFAULT_TELEPROMPTER_TEXT =
   'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
-const BASE_WPM = 130; // baseline reading speed
+const BASE_WPM = 130;
 const MIN_SCROLL_SECONDS = 10;
 const MAX_SCROLL_SECONDS = 600;
 
@@ -11,19 +11,39 @@ const Teleprompter = () => {
   const [text, setText] = useState(DEFAULT_TELEPROMPTER_TEXT);
   const [isRunning, setIsRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
+  const [isDone, setIsDone] = useState(false);
   const [offset, setOffset] = useState(0);
   const [scrollDistance, setScrollDistance] = useState(0);
   const [viewportVersion, setViewportVersion] = useState(0);
+  const [playTrigger, setPlayTrigger] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const offsetRef = useRef(0);
   const frameRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
+  const isRunningRef = useRef(true);
+  const isDoneRef = useRef(false);
 
   const setOffsetValue = (value: number) => {
     offsetRef.current = value;
     setOffset(value);
   };
+
+  const recalculateScrollDistance = () => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    const naturalDistance = Math.max(
+      0,
+      content.scrollHeight - viewport.clientHeight
+    );
+
+    setScrollDistance(
+      naturalDistance > 0 ? naturalDistance : content.scrollHeight
+    );
+  };
+
   const duration = useMemo(() => {
     const words = text.trim().split(/\s+/).filter(Boolean).length;
     const secondsForWords = words > 0 ? (words / BASE_WPM) * 60 : 30;
@@ -38,14 +58,9 @@ const Teleprompter = () => {
     return Math.min(Math.round((Math.abs(offset) / scrollDistance) * 100), 100);
   }, [offset, scrollDistance]);
 
+  // Sync text from main process
   useEffect(() => {
     let isMounted = true;
-    const handleTextChange = (newText: string) => {
-      if (!isMounted) return;
-      setText(newText);
-      setOffsetValue(0);
-      startRef.current = null;
-    };
 
     const syncInitialText = async () => {
       if (!window.electronAPI?.getTeleprompterText) return;
@@ -54,6 +69,8 @@ const Teleprompter = () => {
         if (isMounted && typeof savedText === 'string') {
           setText(savedText ?? DEFAULT_TELEPROMPTER_TEXT);
           setOffsetValue(0);
+          isDoneRef.current = false;
+          setIsDone(false);
           startRef.current = null;
         }
       } catch (error) {
@@ -63,40 +80,102 @@ const Teleprompter = () => {
 
     syncInitialText();
 
-    const unsubscribe = window.electronAPI?.onTeleprompterTextChange
-      ? window.electronAPI.onTeleprompterTextChange(handleTextChange)
+    const unsubText = window.electronAPI?.onTeleprompterTextChange
+      ? window.electronAPI.onTeleprompterTextChange((newText: string) => {
+          if (!isMounted) return;
+          setText(newText);
+          setOffsetValue(0);
+          isDoneRef.current = false;
+          setIsDone(false);
+          startRef.current = null;
+        })
       : undefined;
 
-    // Add keyboard shortcut to close (ESC key)
+    return () => {
+      isMounted = false;
+      unsubText?.();
+    };
+  }, []);
+
+  // Listen to commands from MiniPanel via IPC
+  useEffect(() => {
+    const unsubPlay = window.electronAPI?.onTeleprompterPlay?.(() => {
+      // If was done, reset to start so animation doesn't immediately re-finish
+      if (isDoneRef.current) {
+        setOffsetValue(0);
+        isDoneRef.current = false;
+      }
+      startRef.current = null;
+      isRunningRef.current = true;
+      setIsRunning(true);
+      setIsDone(false);
+      // Force effect re-run even if isRunning was already true
+      setPlayTrigger((n) => n + 1);
+    });
+
+    const unsubPause = window.electronAPI?.onTeleprompterPause?.(() => {
+      isRunningRef.current = false;
+      setIsRunning(false);
+    });
+
+    const unsubReset = window.electronAPI?.onTeleprompterReset?.(() => {
+      isRunningRef.current = false;
+      isDoneRef.current = false;
+      setIsRunning(false);
+      setIsDone(false);
+      setOffsetValue(0);
+      startRef.current = null;
+    });
+
+    const unsubSpeed = window.electronAPI?.onTeleprompterSetSpeed?.(
+      (s: number) => {
+        setSpeed(s);
+        startRef.current = null;
+      }
+    );
+
+    return () => {
+      unsubPlay?.();
+      unsubPause?.();
+      unsubReset?.();
+      unsubSpeed?.();
+    };
+  }, []);
+
+  // Keyboard shortcuts: Space = play/pause, R = reset, ESC = close
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         window.electronAPI?.closeTeleprompter();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        const next = !isRunningRef.current;
+        isRunningRef.current = next;
+        if (next) {
+          if (isDoneRef.current) {
+            setOffsetValue(0);
+            isDoneRef.current = false;
+          }
+          startRef.current = null;
+          setIsDone(false);
+          setPlayTrigger((n) => n + 1);
+        }
+        setIsRunning(next);
+      } else if (e.key === 'r' || e.key === 'R') {
+        isRunningRef.current = false;
+        isDoneRef.current = false;
+        setIsRunning(false);
+        setIsDone(false);
+        setOffsetValue(0);
+        startRef.current = null;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      isMounted = false;
-      unsubscribe?.();
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handlePlay = () => {
-    setIsRunning(true);
-  };
-
-  const handlePause = () => {
-    setIsRunning(false);
-  };
-
-  const handleStop = () => {
-    setIsRunning(false);
-    setOffsetValue(0); // reset posição
-    startRef.current = null;
-  };
-
-  // Observa redimensionamento do container para recalcular distância de rolagem
+  // Observe viewport resize
   useEffect(() => {
     const target = viewportRef.current;
     if (!target) return;
@@ -104,45 +183,33 @@ const Teleprompter = () => {
     const handleResize = () => {
       setViewportVersion((v) => v + 1);
     };
-
-    const observer = new ResizeObserver(() => {
-      handleResize();
-    });
+    const observer = new ResizeObserver(handleResize);
     observer.observe(target);
     window.addEventListener('resize', handleResize);
+    const frameId = window.requestAnimationFrame(handleResize);
 
     return () => {
       observer.disconnect();
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
     };
   }, []);
 
+  // Compute scroll distance
   useEffect(() => {
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    if (!viewport || !content) return;
-
-    setScrollDistance(
-      Math.max(0, content.scrollHeight - viewport.clientHeight)
-    );
+    const frameId = window.requestAnimationFrame(recalculateScrollDistance);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, [text, viewportVersion]);
 
-  // Anima a rolagem com base em pixels para evitar saltos de velocidade em textos longos/curtos
+  // Animation loop
   useEffect(() => {
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    if (!viewport || !content) return;
-
-    const viewportHeight = viewport.clientHeight;
-    const contentHeight = content.scrollHeight;
-    const distance = Math.max(0, contentHeight - viewportHeight);
-    setScrollDistance(distance);
-
-    if (distance === 0) {
-      setOffsetValue(0);
+    if (scrollDistance === 0) {
       return;
     }
 
+    const distance = scrollDistance;
     const durationMs = duration * 1000;
 
     const animate = (timestamp: number) => {
@@ -163,8 +230,14 @@ const Teleprompter = () => {
       }
 
       if (progress >= 1) {
-        setOffsetValue(0); // volta ao topo
-        startRef.current = timestamp; // reinicia ciclo
+        // Stop at end, don't loop
+        setOffsetValue(-distance);
+        setIsRunning(false);
+        setIsDone(true);
+        isRunningRef.current = false;
+        isDoneRef.current = true;
+        window.electronAPI?.teleprompterScrollDone?.();
+        return;
       }
 
       frameRef.current = requestAnimationFrame(animate);
@@ -183,44 +256,47 @@ const Teleprompter = () => {
       frameRef.current = null;
       startRef.current = null;
     };
-  }, [isRunning, duration, text, viewportVersion]);
-
-  const handleClose = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    window.electronAPI?.closeTeleprompter();
-  };
+  }, [isRunning, duration, scrollDistance, playTrigger]);
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white drag-region">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.55),rgba(0,0,0,0.22)_20%,rgba(0,0,0,0.22)_80%,rgba(0,0,0,0.72))]" />
 
-      <div className="relative z-10 flex justify-end px-6 pt-6 no-drag">
+      {/* Top gradient fade */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-black via-black/70 to-transparent" />
+
+      {/* Bottom gradient fade */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black via-black/80 to-transparent" />
+
+      {/* Close button */}
+      <div className="absolute right-5 top-5 z-20 no-drag">
         <button
-          onClick={handleClose}
+          onClick={() => window.electronAPI?.closeTeleprompter()}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          onMouseUp={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white transition duration-200 hover:border-white/20 hover:bg-white/[0.10]"
-          style={{
-            pointerEvents: 'auto',
-            userSelect: 'none',
-            zIndex: 9999,
-          }}
-          title="Fechar Teleprompter (ou pressione ESC)"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/50 transition duration-200 hover:border-white/20 hover:bg-white/[0.10] hover:text-white"
+          title="Fechar (ESC)"
         >
-          <X className="w-6 h-6" />
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
         </button>
       </div>
 
-      <div className="relative z-10 flex flex-1 items-center px-8 pb-8 pt-3">
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-32 bg-gradient-to-b from-black via-black/70 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-8 bottom-0 h-40 bg-gradient-to-t from-black via-black/80 to-transparent" />
+      {/* Scrolling text */}
+      <div className="relative z-10 flex flex-1 items-center px-8 pb-8 pt-8">
         <div
           ref={viewportRef}
           className="relative mx-auto h-full w-full max-w-5xl overflow-hidden px-8"
@@ -235,87 +311,136 @@ const Teleprompter = () => {
         </div>
       </div>
 
-      <div className="relative z-10 no-drag mx-5 mb-2 h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-cyan-400/70 transition-none"
-          style={{ width: `${scrollProgressPercent}%` }}
-          role="progressbar"
-          aria-valuenow={scrollProgressPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Progresso da rolagem"
-        />
+      {/* "Done" overlay */}
+      {isDone && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center no-drag">
+          <div className="rounded-[20px] border border-white/10 bg-black/60 px-6 py-4 text-center backdrop-blur-xl">
+            <p className="text-sm font-semibold text-cyan-300">
+              Roteiro concluído
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Pressione R para voltar ao início
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Controls bar */}
+      <div className="relative z-20 no-drag mx-5 mb-5 space-y-2">
+        {/* Progress bar */}
+        <div className="h-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-cyan-400/70 transition-none"
+            style={{ width: `${scrollProgressPercent}%` }}
+            role="progressbar"
+            aria-valuenow={scrollProgressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Progresso da rolagem"
+          />
+        </div>
+
+        {/* Buttons + speed */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-[rgba(12,14,18,0.80)] px-4 py-2.5 backdrop-blur-xl">
+          <div className="flex items-center gap-2">
+            {/* Play / Pause */}
+            <button
+              onClick={() => {
+                if (isRunning) {
+                  isRunningRef.current = false;
+                  setIsRunning(false);
+                } else {
+                  if (isDoneRef.current) {
+                    setOffsetValue(0);
+                    isDoneRef.current = false;
+                  }
+                  startRef.current = null;
+                  isRunningRef.current = true;
+                  setIsRunning(true);
+                  setIsDone(false);
+                  setPlayTrigger((n) => n + 1);
+                }
+              }}
+              className={`flex items-center gap-2 rounded-[14px] border px-3 py-1.5 text-sm font-semibold transition duration-200 ${
+                isRunning
+                  ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
+                  : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
+              }`}
+              title="Play / Pause (Space)"
+            >
+              {isRunning ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {isRunning ? 'Pausar' : 'Iniciar'}
+            </button>
+
+            {/* Restart */}
+            <button
+              onClick={() => {
+                isDoneRef.current = false;
+                setOffsetValue(0);
+                startRef.current = null;
+                isRunningRef.current = true;
+                setIsRunning(true);
+                setIsDone(false);
+                setPlayTrigger((n) => n + 1);
+              }}
+              className="flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+              title="Reiniciar (R)"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reiniciar
+            </button>
+
+            {/* Stop */}
+            <button
+              onClick={() => {
+                isDoneRef.current = false;
+                isRunningRef.current = false;
+                setIsRunning(false);
+                setIsDone(false);
+                setOffsetValue(0);
+                startRef.current = null;
+              }}
+              className="flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+              title="Parar e voltar ao início"
+            >
+              <Square className="h-4 w-4" />
+              Parar
+            </button>
+          </div>
+
+          {/* Speed */}
+          <div className="flex items-center gap-2 text-sm text-white">
+            <Gauge className="h-4 w-4 text-cyan-200" />
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Ritmo
+            </span>
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={speed}
+              onChange={(e) => {
+                setSpeed(Number(e.target.value));
+                startRef.current = null;
+              }}
+              aria-label="Velocidade de rolagem"
+              className="w-28"
+            />
+            <span className="w-9 text-right font-mono text-sm font-semibold text-slate-100">
+              {speed.toFixed(1)}x
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div
-        className="relative z-10 no-drag mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-[rgba(12,14,18,0.72)] px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-[20px]"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handlePlay}
-            className={`flex items-center gap-2 rounded-[16px] border px-3 py-2 text-sm font-semibold transition duration-200 ${
-              isRunning
-                ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
-                : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
-            }`}
-            title="Reproduzir"
-          >
-            <Play className="h-4 w-4" />
-            Play
-          </button>
-          <button
-            onClick={handlePause}
-            className={`flex items-center gap-2 rounded-[16px] border px-3 py-2 text-sm font-semibold transition duration-200 ${
-              !isRunning
-                ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
-                : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
-            }`}
-            title="Pausar"
-          >
-            <Pause className="h-4 w-4" />
-            Pause
-          </button>
-          <button
-            onClick={handleStop}
-            className="flex items-center gap-2 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
-            title="Parar e voltar ao início"
-          >
-            <Square className="h-4 w-4" />
-            Reset
-          </button>
-        </div>
-        <div className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-black/20 px-3 py-2 text-sm text-white">
-          <Gauge className="h-4 w-4 text-cyan-200" />
-          <span className="text-xs uppercase tracking-[0.24em] text-slate-400">
-            Ritmo
-          </span>
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-            aria-label="Velocidade de rolagem"
-            title="Velocidade do texto"
-            className="w-32"
-          />
-          <span className="font-mono w-10 text-right text-sm font-semibold tracking-[0.08em] text-slate-100">
-            {speed.toFixed(1)}x
-          </span>
-          <span className="text-xs text-slate-500" title="Duração estimada">
-            ~{Math.round(duration)}s
-          </span>
-        </div>
-      </div>
       <style>{`
-        .drag-region {
-          -webkit-app-region: drag;
-        }
-        .no-drag {
-          -webkit-app-region: no-drag;
-        }
+        .drag-region { -webkit-app-region: drag; }
+        .no-drag { -webkit-app-region: no-drag; }
       `}</style>
     </div>
   );
