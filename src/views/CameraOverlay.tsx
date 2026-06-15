@@ -85,7 +85,7 @@ const CameraOverlay = () => {
       case 'square':
         return 'rounded-none';
       case 'rounded':
-        return 'rounded-3xl';
+        return 'rounded-2xl';
       case 'circle':
       default:
         return 'rounded-full';
@@ -94,20 +94,18 @@ const CameraOverlay = () => {
 
   return (
     <div
-      className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-transparent drag-region ring-2 ring-cyan-400/60 shadow-[0_0_24px_rgba(110,231,249,0.45)] ${getShapeClass()}`}
+      className={`drag-region relative flex h-full w-full items-center justify-center overflow-hidden bg-transparent ring-2 ring-[var(--border-strong)] shadow-panel ${getShapeClass()}`}
     >
       {isLoading && !visibleMessage && (
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-overlay)]">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-default)] border-t-[var(--text-primary)]" />
         </div>
       )}
       {visibleMessage ? (
-        <div className="flex h-full w-full flex-col items-start justify-end bg-[linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.72))] p-5 gap-3">
-          <div className="max-w-[78%] rounded-[20px] border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Camera status
-            </p>
-            <p className="mt-2 text-sm font-medium text-slate-100">
+        <div className="flex h-full w-full flex-col items-start justify-end gap-2.5 bg-gradient-to-t from-black/80 to-black/20 p-4">
+          <div className="max-w-[85%] rounded-control border border-[var(--border-default)] bg-black/50 px-3.5 py-2.5 backdrop-blur-md">
+            <p className="label-caps">Câmera</p>
+            <p className="mt-1 text-sm text-[var(--text-primary)]">
               {visibleMessage}
             </p>
           </div>
@@ -115,7 +113,7 @@ const CameraOverlay = () => {
             <button
               onClick={() => void startCamera()}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="rounded-[16px] border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition duration-200 hover:bg-white/20"
+              className="btn-ghost px-3 py-1.5 text-xs"
             >
               Tentar novamente
             </button>
@@ -129,9 +127,9 @@ const CameraOverlay = () => {
             muted
             playsInline
             aria-label="Feed da câmera (imagem espelhada)"
-            className="block h-full w-full object-cover transform scale-x-[-1]"
+            className="block h-full w-full scale-x-[-1] transform object-cover"
           />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.00),rgba(0,0,0,0.08)_65%,rgba(0,0,0,0.26))]" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
         </>
       )}
       <style>{`

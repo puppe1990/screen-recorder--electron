@@ -5,7 +5,6 @@ import {
   Circle,
   Eye,
   EyeOff,
-  Monitor,
   Pause,
   Play,
   RotateCcw,
@@ -670,19 +669,8 @@ const MiniPanel = () => {
     void startRecording();
   };
 
-  const sectionCardClass =
-    'rounded-[28px] border border-white/8 bg-[rgba(18,23,30,0.88)] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]';
-  const quietButtonClass =
-    'rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 transition duration-200 hover:border-white/18 hover:bg-white/[0.08]';
-  const activeAccentButtonClass =
-    'rounded-[18px] border border-cyan-300/25 bg-cyan-300/14 text-cyan-50 shadow-[0_12px_30px_rgba(110,231,249,0.12)]';
-  const segmentedButtonClass =
-    'rounded-[18px] border border-white/8 bg-black/20 px-3 py-3 text-sm font-semibold text-slate-300 transition duration-200 hover:border-white/16 hover:bg-white/[0.06]';
-  const sectionLabelClass =
-    'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500';
-  const recordingButtonClass = isRecording
-    ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white shadow-[0_18px_40px_rgba(255,93,115,0.28)] hover:brightness-105'
-    : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950 shadow-[0_18px_40px_rgba(110,231,249,0.24)] hover:brightness-105';
+  const drag = { WebkitAppRegion: 'drag' } as React.CSSProperties;
+  const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
 
   return (
     <>
@@ -693,139 +681,134 @@ const MiniPanel = () => {
           onCancel={closePreview}
           isSaving={isSaving}
           saveError={saveError}
+          initialFormat={videoFormat}
         />
       )}
 
-      <div
-        className="h-screen w-screen overflow-hidden bg-transparent px-3 py-3 text-white"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
-        <div className="relative mx-auto flex h-full max-w-[1080px] flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(160deg,rgba(13,16,22,0.98),rgba(8,10,15,0.98))] shadow-[0_30px_120px_rgba(0,0,0,0.52)] backdrop-blur-2xl">
-          <div className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.10),transparent_60%)]" />
-
-          <div
-            className={`grid items-center gap-3 px-4 ${isExpanded ? 'border-b border-white/8 py-4' : 'grid-cols-[auto,minmax(0,1fr),auto,auto,auto] py-3'}`}
+      <div className="app-shell h-screen w-screen px-2.5 py-2.5">
+        <div className="panel-frame mx-auto flex h-full max-w-[1040px] flex-col">
+          {/* Toolbar */}
+          <header
+            className={`flex shrink-0 items-center gap-3 px-3.5 ${isExpanded ? 'border-b border-[var(--border-subtle)] py-3.5' : 'py-2.5'}`}
           >
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${isRecording ? 'bg-[#FF5D73] shadow-[0_0_14px_rgba(255,93,115,0.95)]' : 'bg-[#8CF0C7] shadow-[0_0_10px_rgba(140,240,199,0.4)]'}`}
+            <div className="flex min-w-0 items-center gap-2.5" style={drag}>
+              <span
+                className={`status-dot ${isRecording ? 'status-dot-recording' : 'status-dot-idle'}`}
               />
-              <p className="truncate text-sm font-semibold text-slate-50">
+              <span className="truncate text-sm font-medium text-[var(--text-primary)]">
                 {statusLabel}
-              </p>
+              </span>
             </div>
 
             {!isExpanded && (
-              <div className="flex min-w-0 items-center gap-3 rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className={sectionLabelClass}>Fonte</p>
-                  <p className="truncate text-sm font-medium text-slate-100">
-                    {selectedSourceName}
-                  </p>
+              <>
+                <div
+                  className="surface-inset flex min-w-0 flex-1 items-center gap-4 px-3.5 py-2"
+                  style={drag}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="label-caps">Fonte</p>
+                    <p className="truncate text-sm text-[var(--text-primary)]">
+                      {selectedSourceName}
+                    </p>
+                  </div>
+                  <div className="h-6 w-px bg-[var(--border-subtle)]" />
+                  <div className="shrink-0 text-right">
+                    <p className="label-caps">Timer</p>
+                    <p className="font-mono text-base font-semibold tabular-nums text-[var(--text-primary)]">
+                      {isRecording ? formatTime(seconds) : '00:00'}
+                    </p>
+                  </div>
                 </div>
-                <div className="h-8 w-px bg-white/8" />
-                <div className="text-right">
-                  <p className={sectionLabelClass}>Timer</p>
-                  <p className="font-mono text-lg font-semibold tracking-[0.12em] text-white">
-                    {isRecording ? formatTime(seconds) : '00:00'}
-                  </p>
+
+                <div
+                  className="flex shrink-0 items-center gap-2"
+                  style={noDrag}
+                >
+                  <button
+                    onClick={handleTeleprompterToggle}
+                    className={`btn px-3 py-2 text-sm ${
+                      teleprompterIsOpen ? 'btn-accent' : 'btn-ghost'
+                    }`}
+                    title={
+                      teleprompterIsOpen
+                        ? 'Fechar teleprompter'
+                        : 'Abrir teleprompter'
+                    }
+                  >
+                    <StickyNote className="h-4 w-4" />
+                    <span className="hidden sm:inline">Script</span>
+                  </button>
+
+                  <button
+                    onClick={handleToggleExpand}
+                    aria-expanded={isExpanded}
+                    aria-label="Expandir controles"
+                    className="btn-ghost px-2.5 py-2"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={handleToggleRecording}
+                    disabled={!isRecording && !selectedSourceId}
+                    className={`btn px-4 py-2 text-sm ${isRecording ? 'btn-stop' : 'btn-record'}`}
+                    title={
+                      !isRecording && !selectedSourceId
+                        ? 'Selecione uma fonte antes de gravar'
+                        : isRecording
+                          ? 'Parar gravação'
+                          : 'Iniciar gravação'
+                    }
+                  >
+                    {isRecording ? (
+                      <Square className="h-4 w-4 fill-current" />
+                    ) : (
+                      <Video className="h-4 w-4" />
+                    )}
+                    {isRecording ? 'Parar' : 'Gravar'}
+                  </button>
                 </div>
-              </div>
+              </>
             )}
 
             {isExpanded && (
-              <div className="grid flex-1 grid-cols-[minmax(0,1fr),auto] gap-3">
-                <div className="rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3">
-                  <p className={sectionLabelClass}>Fonte atual</p>
-                  <p className="mt-1 truncate text-sm font-medium text-slate-100">
-                    {selectedSourceName}
-                  </p>
+              <>
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                  style={drag}
+                >
+                  <div className="surface-inset min-w-0 flex-1 px-3.5 py-2">
+                    <p className="label-caps">Fonte</p>
+                    <p className="truncate text-sm text-[var(--text-primary)]">
+                      {selectedSourceName}
+                    </p>
+                  </div>
+                  <div className="surface-inset shrink-0 px-3.5 py-2 text-right">
+                    <p className="label-caps">Timer</p>
+                    <p className="font-mono text-base font-semibold tabular-nums">
+                      {isRecording ? formatTime(seconds) : '00:00'}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-[22px] border border-white/8 bg-white/[0.04] px-4 py-3 text-right">
-                  <p className={sectionLabelClass}>Timer</p>
-                  <p className="mt-1 font-mono text-lg font-semibold tracking-[0.12em] text-white">
-                    {isRecording ? formatTime(seconds) : '00:00'}
-                  </p>
-                </div>
-              </div>
+                <button
+                  onClick={handleToggleExpand}
+                  aria-expanded={isExpanded}
+                  aria-label="Ocultar controles"
+                  className="btn-ghost shrink-0 px-3 py-2 text-sm"
+                  style={noDrag}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                  Ocultar
+                </button>
+              </>
             )}
-
-            <div
-              className={`flex items-center gap-2 ${isExpanded ? 'justify-end' : ''}`}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            >
-              <button
-                onClick={handleToggleExpand}
-                aria-expanded={isExpanded}
-                aria-label={
-                  isExpanded ? 'Ocultar controles' : 'Expandir controles'
-                }
-                className={quietButtonClass}
-              >
-                <span className="flex items-center gap-2">
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                  {isExpanded ? 'Ocultar controles' : 'Expandir controles'}
-                </span>
-              </button>
-            </div>
-
-            {!isExpanded && (
-              <button
-                onClick={handleTeleprompterToggle}
-                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                className={`rounded-[20px] px-4 py-3.5 text-sm font-semibold transition duration-200 ${
-                  teleprompterIsOpen
-                    ? 'border border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
-                    : 'border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
-                }`}
-                title={
-                  teleprompterIsOpen
-                    ? 'Fechar teleprompter'
-                    : 'Abrir teleprompter'
-                }
-              >
-                <span className="flex items-center gap-2">
-                  <StickyNote className="h-4 w-4" />
-                  Script
-                </span>
-              </button>
-            )}
-
-            {!isExpanded && (
-              <button
-                onClick={handleToggleRecording}
-                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                disabled={!isRecording && !selectedSourceId}
-                className={`min-w-[150px] rounded-[20px] px-5 py-3.5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
-                title={
-                  !isRecording && !selectedSourceId
-                    ? 'Selecione uma fonte antes de gravar'
-                    : isRecording
-                      ? 'Parar gravação'
-                      : 'Iniciar gravação'
-                }
-              >
-                <span className="flex items-center gap-2">
-                  <Video className="h-4 w-4" />
-                  {isRecording ? 'Parar' : 'Gravar'}
-                </span>
-              </button>
-            )}
-          </div>
+          </header>
 
           {(errorMessage || statusMessage) && (
-            <div className="px-4 pb-3">
+            <div className="px-3.5 pb-2.5">
               <div
-                className={`rounded-[22px] border px-4 py-3 text-sm ${
-                  errorMessage
-                    ? 'border-[#FF5D73]/40 bg-[#FF5D73]/10 text-rose-50'
-                    : 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
-                }`}
+                className={`px-3.5 py-2.5 text-sm ${errorMessage ? 'alert-error' : 'alert-info'}`}
               >
                 {errorMessage ?? statusMessage}
               </div>
@@ -833,13 +816,16 @@ const MiniPanel = () => {
           )}
 
           {isExpanded && (
-            <>
-              <div className="border-t border-white/8 px-4 py-4">
+            <div
+              className="flex min-h-0 flex-1 flex-col"
+              data-testid="expanded-controls"
+              style={noDrag}
+            >
+              <div className="border-b border-[var(--border-subtle)] px-3.5 py-3">
                 <button
                   onClick={handleToggleRecording}
-                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                   disabled={!isRecording && !selectedSourceId}
-                  className={`w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${recordingButtonClass}`}
+                  className={`btn w-full py-3 text-sm ${isRecording ? 'btn-stop' : 'btn-record'}`}
                   title={
                     !isRecording && !selectedSourceId
                       ? 'Selecione uma fonte antes de gravar'
@@ -848,33 +834,25 @@ const MiniPanel = () => {
                         : 'Iniciar gravação'
                   }
                 >
-                  <span className="flex items-center justify-center gap-2">
+                  {isRecording ? (
+                    <Square className="h-4 w-4 fill-current" />
+                  ) : (
                     <Video className="h-4 w-4" />
-                    {isRecording ? 'Parar gravação' : 'Iniciar gravação agora'}
-                  </span>
+                  )}
+                  {isRecording ? 'Parar gravação' : 'Iniciar gravação'}
                 </button>
               </div>
 
-              <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 overflow-auto border-t border-white/8 px-4 py-4 xl:grid-cols-[1.15fr_0.85fr]">
-                <section className="space-y-4">
-                  <div
-                    className={sectionCardClass}
-                    style={
-                      { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-                    }
-                  >
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-200">
-                        <Monitor className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-white">
-                          Fonte de gravação
-                        </h2>
-                        <p className="text-sm text-slate-400">
-                          Escolha a tela certa sem sair do mini painel.
-                        </p>
-                      </div>
+              <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3.5 xl:grid-cols-[1.1fr_0.9fr]">
+                <section className="space-y-3">
+                  <div className="surface p-4">
+                    <div className="mb-4">
+                      <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                        Fonte de gravação
+                      </h2>
+                      <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                        Escolha a tela ou janela para capturar.
+                      </p>
                     </div>
 
                     <div className="relative" ref={sourceDropdownRef}>
@@ -891,7 +869,7 @@ const MiniPanel = () => {
                         aria-expanded={sourceDropdownOpen}
                         aria-label="Selecionar fonte de gravação"
                         aria-controls="source-dropdown-list"
-                        className="flex w-full items-center justify-between rounded-[20px] border border-white/10 bg-black/30 px-4 py-4 text-sm text-white outline-none transition duration-200 hover:border-white/[0.18] focus-visible:border-cyan-300/50 focus-visible:ring-1 focus-visible:ring-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="input-field flex items-center justify-between py-3.5 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <span className="truncate">
                           {isLoadingSources
@@ -903,7 +881,7 @@ const MiniPanel = () => {
                               : selectedSourceName}
                         </span>
                         <ChevronDown
-                          className={`ml-3 h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${sourceDropdownOpen ? 'rotate-180' : ''}`}
+                          className={`ml-3 h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${sourceDropdownOpen ? 'rotate-180' : ''}`}
                         />
                       </button>
                       {sourceDropdownOpen && sources.length > 0 && (
@@ -911,7 +889,8 @@ const MiniPanel = () => {
                           id="source-dropdown-list"
                           role="listbox"
                           aria-labelledby="source-dropdown-trigger"
-                          className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-[20px] border border-white/10 bg-[rgba(13,16,22,0.98)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+                          className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden border border-[var(--border-default)] bg-[var(--bg-overlay)] shadow-panel"
+                          style={{ borderRadius: 'var(--radius-md)' }}
                         >
                           {sources.map((source) => (
                             <li key={source.id} role="presentation">
@@ -924,13 +903,13 @@ const MiniPanel = () => {
                                   setSourceDropdownOpen(false);
                                   setFocusedSourceIndex(-1);
                                 }}
-                                className={`w-full px-4 py-3.5 text-left text-sm transition duration-150 hover:bg-white/[0.06] ${
+                                className={`w-full px-3.5 py-2.5 text-left text-sm transition-colors duration-150 hover:bg-white/[0.04] ${
                                   selectedSourceId === source.id
-                                    ? 'bg-cyan-300/[0.08] text-cyan-100'
-                                    : 'text-slate-200'
+                                    ? 'bg-[var(--accent-muted)] text-indigo-100'
+                                    : 'text-[var(--text-secondary)]'
                                 } ${
                                   focusedSourceIndex === sources.indexOf(source)
-                                    ? 'outline-none ring-1 ring-inset ring-cyan-300/30'
+                                    ? 'ring-1 ring-inset ring-[var(--accent-border)]'
                                     : ''
                                 }`}
                               >
@@ -947,7 +926,7 @@ const MiniPanel = () => {
                         type="button"
                         onClick={() => void loadSources()}
                         disabled={isRecording || isSaving || isLoadingSources}
-                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 transition duration-200 hover:border-white/18 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="btn-ghost px-3 py-1.5 text-xs"
                       >
                         {isLoadingSources
                           ? 'Atualizando...'
@@ -956,39 +935,37 @@ const MiniPanel = () => {
                     </div>
                   </div>
 
-                  <div
-                    className={sectionCardClass}
-                    style={
-                      { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-                    }
-                  >
-                    <h2 className="text-lg font-semibold text-white">
+                  <div className="surface p-4">
+                    <h2 className="text-base font-semibold text-[var(--text-primary)]">
                       Formato de exportação
                     </h2>
-                    <p className="mt-1 text-sm text-slate-400">
-                      Escolha o container antes de gravar.
+                    <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                      Container usado ao salvar a gravação.
                     </p>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                       {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map(
                         (format) => (
                           <button
                             key={format}
                             type="button"
+                            data-testid={`export-format-${format}`}
+                            style={noDrag}
                             disabled={isRecording}
                             onClick={() => setVideoFormat(format)}
-                            className={`rounded-[20px] border p-4 text-left transition duration-200 ${
+                            aria-pressed={videoFormat === format}
+                            className={`surface-inset p-3.5 text-left transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
                               videoFormat === format
-                                ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-50'
-                                : 'border-white/10 bg-black/25 text-slate-300 hover:border-white/18'
+                                ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
+                                : 'hover:border-[var(--border-strong)]'
                             }`}
                           >
-                            <p className="font-semibold">
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
                               {format === 'webm-vp9' && 'WebM (VP9)'}
                               {format === 'webm-vp8' && 'WebM (VP8)'}
                               {format === 'mp4' && 'MP4 (H.264)'}
                             </p>
-                            <p className="mt-1 text-xs text-slate-400">
+                            <p className="mt-1 text-xs text-[var(--text-muted)]">
                               {getFormatHelperText(format)}
                             </p>
                           </button>
@@ -996,37 +973,28 @@ const MiniPanel = () => {
                       )}
                     </div>
 
-                    <p className="mt-3 text-xs text-slate-500">
-                      Extensão final: .{resolveSaveExtension(videoFormat)}
+                    <p className="mt-2.5 text-xs text-[var(--text-muted)]">
+                      Extensão: .{resolveSaveExtension(videoFormat)}
                     </p>
                   </div>
                 </section>
 
-                <aside className="space-y-4">
-                  <div
-                    className={sectionCardClass}
-                    style={
-                      { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-                    }
-                  >
-                    <h2 className="text-lg font-semibold text-white">
+                <aside className="space-y-3">
+                  <div className="surface p-4">
+                    <h2 className="text-base font-semibold text-[var(--text-primary)]">
                       Overlay da câmera
                     </h2>
-                    <div className="mt-4 space-y-4">
+                    <div className="mt-3 space-y-3.5">
                       <div>
-                        <p className={sectionLabelClass}>Formato</p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <p className="label-caps mb-2">Formato</p>
+                        <div className="grid grid-cols-3 gap-1.5">
                           {(
                             ['circle', 'rounded', 'square'] as CameraShape[]
                           ).map((shape) => (
                             <button
                               key={shape}
                               onClick={() => handleCameraShape(shape)}
-                              className={`px-3 py-3 text-sm font-semibold transition duration-200 ${
-                                cameraShape === shape
-                                  ? `${segmentedButtonClass} ${activeAccentButtonClass}`
-                                  : segmentedButtonClass
-                              }`}
+                              className={`btn-segment ${cameraShape === shape ? 'btn-segment-active' : ''}`}
                             >
                               {shape === 'circle' && (
                                 <Circle className="mx-auto h-4 w-4" />
@@ -1041,18 +1009,14 @@ const MiniPanel = () => {
                       </div>
 
                       <div>
-                        <p className={sectionLabelClass}>Tamanho</p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <p className="label-caps mb-2">Tamanho</p>
+                        <div className="grid grid-cols-3 gap-1.5">
                           {(['small', 'medium', 'large'] as CameraSize[]).map(
                             (size) => (
                               <button
                                 key={size}
                                 onClick={() => handleCameraSize(size)}
-                                className={`px-3 py-3 text-sm font-semibold transition duration-200 ${
-                                  cameraSize === size
-                                    ? `${segmentedButtonClass} ${activeAccentButtonClass}`
-                                    : segmentedButtonClass
-                                }`}
+                                className={`btn-segment ${cameraSize === size ? 'btn-segment-active' : ''}`}
                               >
                                 {size === 'small'
                                   ? 'Compacto'
@@ -1067,99 +1031,74 @@ const MiniPanel = () => {
 
                       <button
                         onClick={handleCameraVisibility}
-                        className={`w-full rounded-[20px] px-4 py-3 text-sm font-semibold transition duration-200 ${
+                        className={`btn w-full py-2.5 text-sm ${
                           cameraVisible
-                            ? 'border border-emerald-300/25 bg-emerald-300/12 text-emerald-100 hover:bg-emerald-300/16'
-                            : 'border border-white/10 bg-black/25 text-slate-200 hover:bg-white/[0.06]'
+                            ? 'border-[var(--success-muted)] bg-[var(--success-muted)] text-green-100 hover:bg-green-500/20'
+                            : 'btn-ghost'
                         }`}
                       >
-                        <span className="flex items-center justify-center gap-2">
-                          {cameraVisible ? (
-                            <Eye className="h-4 w-4" />
-                          ) : (
-                            <EyeOff className="h-4 w-4" />
-                          )}
-                          {cameraVisible ? 'Ocultar câmera' : 'Mostrar câmera'}
-                        </span>
+                        {cameraVisible ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
+                        )}
+                        {cameraVisible ? 'Ocultar câmera' : 'Mostrar câmera'}
                       </button>
                     </div>
                   </div>
 
-                  <div className="rounded-[28px] border border-amber-200/18 bg-[linear-gradient(160deg,rgba(243,201,122,0.10),rgba(243,201,122,0.04))] p-5 text-sm text-amber-50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200/70">
-                      Áudio
-                    </p>
-                    <p className="mt-2">{audioNotice}</p>
+                  <div className="alert-warning p-4 text-sm">
+                    <p className="label-caps text-amber-200/80">Áudio</p>
+                    <p className="mt-1.5 leading-relaxed">{audioNotice}</p>
                   </div>
 
-                  <div
-                    className={sectionCardClass}
-                    style={
-                      { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-                    }
-                  >
-                    {/* Header */}
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 p-2 text-cyan-200">
-                        <StickyNote className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="text-lg font-semibold text-white">
-                          Teleprompter
-                        </h2>
-                      </div>
-                      {/* Status badge */}
+                  <div className="surface p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <h2 className="flex-1 text-base font-semibold text-[var(--text-primary)]">
+                        Teleprompter
+                      </h2>
                       {teleprompterIsOpen &&
                         (teleprompterIsDone ? (
-                          <span className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+                          <span className="rounded-full border border-[var(--accent-border)] bg-[var(--accent-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
                             Concluído
                           </span>
                         ) : teleprompterIsRunning ? (
-                          <span className="flex items-center gap-1.5 rounded-full border border-green-400/40 bg-green-400/10 px-2.5 py-1 text-xs font-semibold text-green-300">
-                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                          <span className="flex items-center gap-1 rounded-full border border-green-500/30 bg-[var(--success-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-200">
+                            <span className="status-dot status-dot-recording !h-1.5 !w-1.5 bg-green-400 shadow-green-400/50" />
                             Ao vivo
                           </span>
                         ) : (
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-400">
+                          <span className="rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                             Pausado
                           </span>
                         ))}
-                      {/* Open / Close toggle — always clickable, lives in header */}
                       <button
                         onClick={handleTeleprompterToggle}
-                        className={`rounded-[14px] border px-3 py-2 text-xs font-semibold transition duration-200 ${
-                          teleprompterIsOpen
-                            ? 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
-                            : 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50 hover:bg-cyan-300/20'
-                        }`}
+                        className={`btn px-2.5 py-1.5 text-xs ${teleprompterIsOpen ? 'btn-ghost' : 'btn-accent'}`}
                         title={
                           teleprompterIsOpen ? 'Fechar janela' : 'Abrir janela'
                         }
                       >
-                        <span className="flex items-center gap-1.5">
-                          {teleprompterIsOpen ? (
-                            <XCircle className="h-3.5 w-3.5" />
-                          ) : (
-                            <Play className="h-3.5 w-3.5" />
-                          )}
-                          {teleprompterIsOpen ? 'Fechar' : 'Abrir'}
-                        </span>
+                        {teleprompterIsOpen ? (
+                          <XCircle className="h-3.5 w-3.5" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5" />
+                        )}
+                        {teleprompterIsOpen ? 'Fechar' : 'Abrir'}
                       </button>
                     </div>
 
-                    {/* Playback controls — dimmed when window closed, but pointer-events still blocked */}
                     <div
-                      className={`mb-4 space-y-3 transition-opacity duration-200 ${teleprompterIsOpen ? 'opacity-100' : 'pointer-events-none opacity-30'}`}
+                      className={`mb-3 space-y-2.5 transition-opacity duration-200 ${teleprompterIsOpen ? 'opacity-100' : 'pointer-events-none opacity-30'}`}
                     >
-                      <div className="flex items-center gap-2">
-                        {/* Start / Pause */}
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={
                             teleprompterIsRunning
                               ? handleTeleprompterPause
                               : handleTeleprompterPlay
                           }
-                          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-cyan-300/25 bg-cyan-300/14 py-2.5 text-xs font-semibold text-cyan-50 transition duration-200 hover:bg-cyan-300/20"
+                          className="btn-accent flex-1 py-2 text-xs"
                           title={
                             teleprompterIsRunning
                               ? 'Pausar (Space)'
@@ -1174,29 +1113,26 @@ const MiniPanel = () => {
                           {teleprompterIsRunning ? 'Pausar' : 'Iniciar'}
                         </button>
 
-                        {/* Restart */}
                         <button
                           onClick={handleTeleprompterRestart}
-                          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+                          className="btn-ghost flex-1 py-2 text-xs"
                           title="Reiniciar do início"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           Reiniciar
                         </button>
 
-                        {/* Stop */}
                         <button
                           onClick={handleTeleprompterStop}
-                          className="flex h-9 w-9 items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.04] text-slate-400 transition duration-200 hover:bg-white/[0.08] hover:text-slate-200"
+                          className="btn-ghost px-2.5 py-2 text-[var(--text-muted)]"
                           title="Parar e voltar ao início"
                         >
                           <Square className="h-3.5 w-3.5" />
                         </button>
                       </div>
 
-                      {/* Speed */}
-                      <div className="flex items-center gap-3 rounded-[14px] border border-white/8 bg-black/20 px-3 py-2">
-                        <span className="text-xs text-slate-400">
+                      <div className="surface-inset flex items-center gap-2.5 px-3 py-2">
+                        <span className="text-xs text-[var(--text-muted)]">
                           Velocidade
                         </span>
                         <input
@@ -1210,18 +1146,17 @@ const MiniPanel = () => {
                               Number(e.target.value)
                             )
                           }
-                          className="flex-1"
+                          className="range-track flex-1"
                           aria-label="Velocidade do teleprompter"
                         />
-                        <span className="w-8 text-right font-mono text-xs font-semibold text-slate-200">
+                        <span className="w-8 text-right font-mono text-xs font-semibold tabular-nums">
                           {teleprompterSpeed.toFixed(1)}x
                         </span>
                       </div>
                     </div>
 
-                    {/* Script textarea */}
                     <textarea
-                      className="h-36 w-full rounded-[20px] border border-white/10 bg-black/25 px-4 py-3 text-sm leading-relaxed text-white outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300/50"
+                      className="input-field h-32 resize-none leading-relaxed"
                       placeholder="Cole ou escreva o roteiro aqui..."
                       value={teleprompterText}
                       onChange={(event) =>
@@ -1231,7 +1166,7 @@ const MiniPanel = () => {
 
                     {teleprompterStatus !== 'idle' && (
                       <p
-                        className={`mt-2 text-xs ${teleprompterStatus === 'error' ? 'text-rose-400' : 'text-cyan-400/70'}`}
+                        className={`mt-1.5 text-xs ${teleprompterStatus === 'error' ? 'text-red-400' : 'text-indigo-300/80'}`}
                       >
                         {teleprompterStatus === 'error'
                           ? 'Erro ao sincronizar'
@@ -1241,7 +1176,7 @@ const MiniPanel = () => {
                   </div>
                 </aside>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,34 +6,34 @@
 
 :root {
   color-scheme: dark;
-  font-family: 'Manrope', sans-serif;
-  background:
-    radial-gradient(circle at top, rgba(110, 231, 249, 0.12), transparent 30%),
-    radial-gradient(
-      circle at bottom right,
-      rgba(123, 92, 255, 0.1),
-      transparent 28%
-    ),
-    #07090d;
-  color: #f5f7fb;
-  --app-bg: #07090d;
-  --panel-bg: rgba(15, 18, 24, 0.92);
-  --panel-bg-strong: rgba(18, 23, 30, 0.98);
-  --panel-elevated: rgba(22, 28, 36, 0.92);
-  --panel-soft: rgba(255, 255, 255, 0.04);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --panel-border-strong: rgba(255, 255, 255, 0.14);
-  --text-primary: #f5f7fb;
-  --text-secondary: #98a2b3;
-  --text-muted: #667085;
-  --accent: #6ee7f9;
-  --accent-strong: #0e7490;
-  --danger: #ff5d73;
-  --success: #8cf0c7;
-  --warning: #f3c97a;
-  --radius-panel: 28px;
-  --radius-control: 18px;
-  --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.45);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: #09090b;
+  color: #fafafa;
+  --bg-base: #09090b;
+  --bg-raised: #111113;
+  --bg-overlay: #18181b;
+  --bg-muted: #27272a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #818cf8;
+  --accent-muted: rgba(129, 140, 248, 0.12);
+  --accent-border: rgba(129, 140, 248, 0.28);
+  --record: #f87171;
+  --record-muted: rgba(248, 113, 113, 0.14);
+  --record-border: rgba(248, 113, 113, 0.32);
+  --success: #4ade80;
+  --success-muted: rgba(74, 222, 128, 0.12);
+  --warning-muted: rgba(251, 191, 36, 0.1);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-panel: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html,
@@ -45,11 +45,11 @@ body,
 html,
 body {
   margin: 0;
-  background: var(--app-bg);
+  background: var(--bg-base);
 }
 
 body {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -60,12 +60,12 @@ body {
 }
 
 ::selection {
-  background: rgba(110, 231, 249, 0.22);
+  background: rgba(129, 140, 248, 0.25);
   color: var(--text-primary);
 }
 
 .font-mono {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 @layer base {
@@ -80,12 +80,111 @@ body {
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid rgba(110, 231, 249, 0.9);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+}
 
-  input[type='range'] {
-    accent-color: var(--accent);
+@layer components {
+  .app-shell {
+    @apply overflow-hidden bg-transparent text-[var(--text-primary)];
+  }
+
+  .panel-frame {
+    @apply relative flex flex-col overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-raised)] shadow-[var(--shadow-panel)];
+    border-radius: var(--radius-xl);
+  }
+
+  .surface {
+    @apply border border-[var(--border-subtle)] bg-[var(--bg-overlay)];
+    border-radius: var(--radius-lg);
+  }
+
+  .surface-inset {
+    @apply border border-[var(--border-subtle)] bg-[var(--bg-base)];
+    border-radius: var(--radius-md);
+  }
+
+  .label-caps {
+    @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 border font-semibold transition-all duration-200;
+    border-radius: var(--radius-md);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-45;
+  }
+
+  .btn-ghost {
+    @apply btn border-[var(--border-default)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-white/[0.04] hover:text-[var(--text-primary)];
+  }
+
+  .btn-accent {
+    @apply btn border-[var(--accent-border)] bg-[var(--accent-muted)] text-indigo-100 hover:bg-indigo-500/20;
+  }
+
+  .btn-record {
+    @apply btn border-transparent bg-[var(--record)] text-white hover:brightness-110;
+  }
+
+  .btn-stop {
+    @apply btn border-transparent bg-[var(--record-muted)] text-red-200 hover:bg-red-500/25;
+  }
+
+  .btn-segment {
+    @apply btn border-[var(--border-subtle)] bg-transparent px-3 py-2.5 text-sm text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-white/[0.03];
+  }
+
+  .btn-segment-active {
+    @apply border-[var(--accent-border)] bg-[var(--accent-muted)] text-indigo-100;
+  }
+
+  .input-field {
+    @apply w-full border border-[var(--border-default)] bg-[var(--bg-base)] px-3.5 py-3 text-sm text-[var(--text-primary)] outline-none transition-colors duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent-border)];
+    border-radius: var(--radius-md);
+  }
+
+  .range-track {
+    @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-[var(--bg-muted)];
+  }
+
+  .range-track::-webkit-slider-thumb {
+    @apply h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border-2 border-[var(--bg-raised)] bg-[var(--accent)];
+  }
+
+  .range-track::-moz-range-thumb {
+    @apply h-3.5 w-3.5 cursor-pointer rounded-full border-2 border-[var(--bg-raised)] bg-[var(--accent)];
+  }
+
+  .status-dot {
+    @apply h-2 w-2 shrink-0 rounded-full;
+  }
+
+  .status-dot-idle {
+    @apply bg-[var(--success)] shadow-[0_0_8px_rgba(74,222,128,0.5)];
+  }
+
+  .status-dot-recording {
+    @apply animate-pulse bg-[var(--record)] shadow-[0_0_10px_rgba(248,113,113,0.7)];
+  }
+
+  .alert-error {
+    @apply border border-[var(--record-border)] bg-[var(--record-muted)] text-red-100;
+    border-radius: var(--radius-md);
+  }
+
+  .alert-info {
+    @apply border border-[var(--accent-border)] bg-[var(--accent-muted)] text-indigo-100;
+    border-radius: var(--radius-md);
+  }
+
+  .alert-warning {
+    @apply border border-amber-500/20 bg-[var(--warning-muted)] text-amber-100;
+    border-radius: var(--radius-md);
   }
 }
 

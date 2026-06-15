@@ -28,7 +28,6 @@ const RecordingTimer = () => {
   };
 
   const handleStopRecording = () => {
-    // This will trigger the stop in the main control panel
     if (window.electronAPI) {
       window.electronAPI.stopRecording();
     }
@@ -60,112 +59,85 @@ const RecordingTimer = () => {
     }
   };
 
+  const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
+
   return (
     <div
-      className="flex h-screen w-screen items-center justify-center overflow-hidden px-4"
+      className="flex h-screen w-screen items-center justify-center overflow-hidden px-3"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div className="flex items-center gap-3 rounded-[24px] border border-white/8 bg-[rgba(10,12,16,0.82)] px-4 py-3 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-[18px]">
-        <div className="flex items-center text-slate-500 cursor-move">
-          <GripVertical className="w-4 h-4" />
-        </div>
+      <div className="panel-frame flex items-center gap-2.5 px-3 py-2.5">
+        <GripVertical className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
 
-        <div className="flex items-center gap-2 border-r border-white/8 pr-4">
-          <div className="relative flex h-3 w-3">
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-[#FF5D73] shadow-[0_0_14px_rgba(255,93,115,0.95)]"></span>
-          </div>
-          <span className="font-mono whitespace-nowrap text-xl font-semibold tracking-[0.08em] text-white">
+        <div className="flex items-center gap-2 border-r border-[var(--border-subtle)] pr-3">
+          <span className="status-dot status-dot-recording" />
+          <span className="font-mono whitespace-nowrap text-lg font-semibold tabular-nums">
             {formatTime(seconds)}
           </span>
         </div>
 
         <div
-          className="flex items-center gap-2 border-r border-white/8 pr-4"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="flex items-center gap-1.5 border-r border-[var(--border-subtle)] pr-3"
+          style={noDrag}
         >
-          <span className="mr-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Forma
-          </span>
-          <button
-            onClick={() => handleCameraShape('circle')}
-            className={`rounded-[16px] border px-3 py-2 transition duration-200 ${cameraShape === 'circle' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Círculo"
-          >
-            <Circle className="w-4 h-4 text-white" />
-          </button>
-          <button
-            onClick={() => handleCameraShape('rounded')}
-            className={`rounded-[16px] border px-3 py-2 transition duration-200 ${cameraShape === 'rounded' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Arredondado"
-          >
-            <div className="w-4 h-4 border-2 border-white rounded-md"></div>
-          </button>
-          <button
-            onClick={() => handleCameraShape('square')}
-            className={`rounded-[16px] border px-3 py-2 transition duration-200 ${cameraShape === 'square' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Quadrado"
-          >
-            <Square className="w-4 h-4 text-white" />
-          </button>
+          <span className="label-caps mr-0.5">Forma</span>
+          {(['circle', 'rounded', 'square'] as CameraShape[]).map((shape) => (
+            <button
+              key={shape}
+              onClick={() => handleCameraShape(shape)}
+              className={`btn-segment px-2.5 py-2 ${cameraShape === shape ? 'btn-segment-active' : ''}`}
+              title={shape}
+            >
+              {shape === 'circle' && <Circle className="h-3.5 w-3.5" />}
+              {shape === 'rounded' && (
+                <div className="h-3.5 w-3.5 rounded border-2 border-current" />
+              )}
+              {shape === 'square' && <Square className="h-3.5 w-3.5" />}
+            </button>
+          ))}
         </div>
 
         <div
-          className="flex items-center gap-2 border-r border-white/8 pr-4"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="flex items-center gap-1.5 border-r border-[var(--border-subtle)] pr-3"
+          style={noDrag}
         >
-          <span className="mr-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Escala
-          </span>
-          <button
-            onClick={() => handleCameraSize('small')}
-            className={`rounded-[16px] border px-3 py-2 text-xs font-semibold transition duration-200 ${cameraSize === 'small' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Pequeno"
-          >
-            Compacto
-          </button>
-          <button
-            onClick={() => handleCameraSize('medium')}
-            className={`rounded-[16px] border px-3 py-2 text-xs font-semibold transition duration-200 ${cameraSize === 'medium' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Médio"
-          >
-            Médio
-          </button>
-          <button
-            onClick={() => handleCameraSize('large')}
-            className={`rounded-[16px] border px-3 py-2 text-xs font-semibold transition duration-200 ${cameraSize === 'large' ? 'border-cyan-300/25 bg-cyan-300/14 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title="Grande"
-          >
-            Palco
-          </button>
+          <span className="label-caps mr-0.5">Escala</span>
+          {(['small', 'medium', 'large'] as CameraSize[]).map((size) => (
+            <button
+              key={size}
+              onClick={() => handleCameraSize(size)}
+              className={`btn-segment px-2 py-2 text-xs ${cameraSize === size ? 'btn-segment-active' : ''}`}
+            >
+              {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
+            </button>
+          ))}
         </div>
 
         <div
-          className="flex items-center gap-2 border-r border-white/8 pr-4"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="border-r border-[var(--border-subtle)] pr-3"
+          style={noDrag}
         >
           <button
             onClick={handleCameraVisibility}
-            className={`rounded-[16px] border p-2.5 transition duration-200 ${cameraVisible ? 'border-emerald-300/25 bg-emerald-300/12 text-emerald-50 hover:bg-emerald-300/18' : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'}`}
-            title={cameraVisible ? 'Ocultar Câmera' : 'Mostrar Câmera'}
+            className={`btn p-2 ${cameraVisible ? 'border-[var(--success-muted)] bg-[var(--success-muted)] text-green-100' : 'btn-ghost'}`}
+            title={cameraVisible ? 'Ocultar câmera' : 'Mostrar câmera'}
           >
             {cameraVisible ? (
-              <Eye className="w-4 h-4 text-white" />
+              <Eye className="h-3.5 w-3.5" />
             ) : (
-              <EyeOff className="w-4 h-4 text-slate-300" />
+              <EyeOff className="h-3.5 w-3.5" />
             )}
           </button>
         </div>
 
-        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div style={noDrag}>
           <button
             onClick={handleStopRecording}
-            className="flex items-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] px-4 py-2.5 font-semibold text-white shadow-[0_18px_38px_rgba(255,93,115,0.26)] transition duration-200 hover:brightness-105"
-            title="Parar Gravação"
+            className="btn-stop px-3 py-2 text-sm"
+            title="Parar gravação"
           >
-            <Square className="w-4 h-4 text-white fill-white" />
-            <span className="text-white font-semibold text-sm whitespace-nowrap">
-              Parar
-            </span>
+            <Square className="h-3.5 w-3.5 fill-current" />
+            Parar
           </button>
         </div>
       </div>
