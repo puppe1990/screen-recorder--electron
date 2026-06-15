@@ -98,6 +98,44 @@ describe('MiniPanel', () => {
     ).toHaveBeenCalledWith(true);
   });
 
+  it('defaults to MP4 and lets the user change export format', async () => {
+    const user = userEvent.setup();
+    render(<MiniPanel />);
+
+    await user.click(
+      screen.getByRole('button', { name: /expandir controles/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/extensão: \.mp4/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('export-format-mp4')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    await user.click(screen.getByTestId('export-format-webm-vp9'));
+
+    expect(screen.getByText(/extensão: \.webm/i)).toBeInTheDocument();
+    expect(screen.getByTestId('export-format-webm-vp9')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByTestId('export-format-mp4')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+
+    await user.click(screen.getByTestId('export-format-mp4'));
+
+    expect(screen.getByText(/extensão: \.mp4/i)).toBeInTheDocument();
+    expect(screen.getByTestId('export-format-mp4')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('sends the latest speed when the teleprompter window opens', async () => {
     const user = userEvent.setup();
     const electronApi = createElectronApiMock();

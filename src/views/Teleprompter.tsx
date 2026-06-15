@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Gauge, Pause, Play, RotateCcw, Square } from 'lucide-react';
+import { Gauge, Pause, Play, RotateCcw, Square, X } from 'lucide-react';
 
 const DEFAULT_TELEPROMPTER_TEXT =
   'This is the teleprompter text. It will scroll automatically.\n\nYou can customize this text in the Control Panel.\n\nRemember to look at the camera!';
@@ -58,7 +58,6 @@ const Teleprompter = () => {
     return Math.min(Math.round((Math.abs(offset) / scrollDistance) * 100), 100);
   }, [offset, scrollDistance]);
 
-  // Sync text from main process
   useEffect(() => {
     let isMounted = true;
 
@@ -97,10 +96,8 @@ const Teleprompter = () => {
     };
   }, []);
 
-  // Listen to commands from MiniPanel via IPC
   useEffect(() => {
     const unsubPlay = window.electronAPI?.onTeleprompterPlay?.(() => {
-      // If was done, reset to start so animation doesn't immediately re-finish
       if (isDoneRef.current) {
         setOffsetValue(0);
         isDoneRef.current = false;
@@ -109,7 +106,6 @@ const Teleprompter = () => {
       isRunningRef.current = true;
       setIsRunning(true);
       setIsDone(false);
-      // Force effect re-run even if isRunning was already true
       setPlayTrigger((n) => n + 1);
     });
 
@@ -142,7 +138,6 @@ const Teleprompter = () => {
     };
   }, []);
 
-  // Keyboard shortcuts: Space = play/pause, R = reset, ESC = close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -175,7 +170,6 @@ const Teleprompter = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Observe viewport resize
   useEffect(() => {
     const target = viewportRef.current;
     if (!target) return;
@@ -195,7 +189,6 @@ const Teleprompter = () => {
     };
   }, []);
 
-  // Compute scroll distance
   useEffect(() => {
     const frameId = window.requestAnimationFrame(recalculateScrollDistance);
     return () => {
@@ -203,7 +196,6 @@ const Teleprompter = () => {
     };
   }, [text, viewportVersion]);
 
-  // Animation loop
   useEffect(() => {
     if (scrollDistance === 0) {
       return;
@@ -230,7 +222,6 @@ const Teleprompter = () => {
       }
 
       if (progress >= 1) {
-        // Stop at end, don't loop
         setOffsetValue(-distance);
         setIsRunning(false);
         setIsDone(true);
@@ -259,51 +250,32 @@ const Teleprompter = () => {
   }, [isRunning, duration, scrollDistance, playTrigger]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white drag-region">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.55),rgba(0,0,0,0.22)_20%,rgba(0,0,0,0.22)_80%,rgba(0,0,0,0.72))]" />
+    <div className="drag-region relative flex h-full w-full flex-col overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-[var(--bg-base)] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 h-24 bg-gradient-to-t from-[var(--bg-base)] to-transparent" />
 
-      {/* Top gradient fade */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-black via-black/70 to-transparent" />
-
-      {/* Bottom gradient fade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black via-black/80 to-transparent" />
-
-      {/* Close button */}
-      <div className="absolute right-5 top-5 z-20 no-drag">
+      <div className="absolute right-4 top-4 z-20 no-drag">
         <button
           onClick={() => window.electronAPI?.closeTeleprompter()}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/50 transition duration-200 hover:border-white/20 hover:bg-white/[0.10] hover:text-white"
+          className="btn-ghost p-2"
           title="Fechar (ESC)"
         >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Scrolling text */}
-      <div className="relative z-10 flex flex-1 items-center px-8 pb-8 pt-8">
+      <div className="relative z-10 flex flex-1 items-center px-6 pb-6 pt-6">
         <div
           ref={viewportRef}
-          className="relative mx-auto h-full w-full max-w-5xl overflow-hidden px-8"
+          className="relative mx-auto h-full w-full max-w-5xl overflow-hidden"
         >
           <div
             ref={contentRef}
-            className="mx-auto max-w-[18ch] whitespace-pre-wrap text-center text-[clamp(2.5rem,4.8vw,4.5rem)] font-semibold leading-[1.22] tracking-[-0.03em] text-slate-50 no-drag will-change-transform"
+            className="no-drag mx-auto max-w-[20ch] whitespace-pre-wrap text-center text-[clamp(2.25rem,4.5vw,4rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary)] will-change-transform"
             style={{ transform: `translateY(${offset}px)` }}
           >
             {text}
@@ -311,26 +283,23 @@ const Teleprompter = () => {
         </div>
       </div>
 
-      {/* "Done" overlay */}
       {isDone && (
         <div className="absolute inset-0 z-30 flex items-center justify-center no-drag">
-          <div className="rounded-[20px] border border-white/10 bg-black/60 px-6 py-4 text-center backdrop-blur-xl">
-            <p className="text-sm font-semibold text-cyan-300">
+          <div className="surface px-5 py-3.5 text-center backdrop-blur-xl">
+            <p className="text-sm font-semibold text-indigo-200">
               Roteiro concluído
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
               Pressione R para voltar ao início
             </p>
           </div>
         </div>
       )}
 
-      {/* Controls bar */}
-      <div className="relative z-20 no-drag mx-5 mb-5 space-y-2">
-        {/* Progress bar */}
-        <div className="h-1 overflow-hidden rounded-full bg-white/10">
+      <div className="relative z-20 no-drag mx-4 mb-4 space-y-2">
+        <div className="h-1 overflow-hidden rounded-full bg-[var(--bg-muted)]">
           <div
-            className="h-full rounded-full bg-cyan-400/70 transition-none"
+            className="h-full rounded-full bg-[var(--accent)] transition-none"
             style={{ width: `${scrollProgressPercent}%` }}
             role="progressbar"
             aria-valuenow={scrollProgressPercent}
@@ -340,10 +309,8 @@ const Teleprompter = () => {
           />
         </div>
 
-        {/* Buttons + speed */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-[rgba(12,14,18,0.80)] px-4 py-2.5 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            {/* Play / Pause */}
+        <div className="surface flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => {
                 if (isRunning) {
@@ -361,22 +328,17 @@ const Teleprompter = () => {
                   setPlayTrigger((n) => n + 1);
                 }
               }}
-              className={`flex items-center gap-2 rounded-[14px] border px-3 py-1.5 text-sm font-semibold transition duration-200 ${
-                isRunning
-                  ? 'border-cyan-300/30 bg-cyan-300/14 text-cyan-50'
-                  : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
-              }`}
+              className={`btn py-1.5 text-xs ${isRunning ? 'btn-accent' : 'btn-ghost'}`}
               title="Play / Pause (Space)"
             >
               {isRunning ? (
-                <Pause className="h-4 w-4" />
+                <Pause className="h-3.5 w-3.5" />
               ) : (
-                <Play className="h-4 w-4" />
+                <Play className="h-3.5 w-3.5" />
               )}
               {isRunning ? 'Pausar' : 'Iniciar'}
             </button>
 
-            {/* Restart */}
             <button
               onClick={() => {
                 isDoneRef.current = false;
@@ -387,14 +349,13 @@ const Teleprompter = () => {
                 setIsDone(false);
                 setPlayTrigger((n) => n + 1);
               }}
-              className="flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+              className="btn-ghost py-1.5 text-xs"
               title="Reiniciar (R)"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-3.5 w-3.5" />
               Reiniciar
             </button>
 
-            {/* Stop */}
             <button
               onClick={() => {
                 isDoneRef.current = false;
@@ -404,20 +365,17 @@ const Teleprompter = () => {
                 setOffsetValue(0);
                 startRef.current = null;
               }}
-              className="flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-white/[0.08]"
+              className="btn-ghost py-1.5 text-xs"
               title="Parar e voltar ao início"
             >
-              <Square className="h-4 w-4" />
+              <Square className="h-3.5 w-3.5" />
               Parar
             </button>
           </div>
 
-          {/* Speed */}
-          <div className="flex items-center gap-2 text-sm text-white">
-            <Gauge className="h-4 w-4 text-cyan-200" />
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Ritmo
-            </span>
+          <div className="flex items-center gap-2 text-sm">
+            <Gauge className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <span className="label-caps">Ritmo</span>
             <input
               type="range"
               min="0.5"
@@ -429,9 +387,9 @@ const Teleprompter = () => {
                 startRef.current = null;
               }}
               aria-label="Velocidade de rolagem"
-              className="w-28"
+              className="range-track w-24"
             />
-            <span className="w-9 text-right font-mono text-sm font-semibold text-slate-100">
+            <span className="w-8 text-right font-mono text-xs font-semibold tabular-nums">
               {speed.toFixed(1)}x
             </span>
           </div>

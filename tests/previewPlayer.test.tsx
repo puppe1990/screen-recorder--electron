@@ -80,4 +80,48 @@ describe('PreviewPlayer', () => {
 
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
   });
+
+  it('defaults to MP4 and allows changing the save format', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <PreviewPlayer
+        videoBlob={new Blob(['video'], { type: 'video/webm' })}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        isSaving={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /salvar mp4/i })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('preview-format-webm-vp9'));
+
+    expect(
+      screen.getByRole('button', { name: /salvar vp9/i })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /salvar vp9/i }));
+
+    expect(onSave).toHaveBeenCalledWith('webm-vp9');
+  });
+
+  it('uses the format chosen in the mini panel as the preview default', async () => {
+    render(
+      <PreviewPlayer
+        videoBlob={new Blob(['video'], { type: 'video/webm' })}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        onCancel={vi.fn()}
+        isSaving={false}
+        initialFormat="webm-vp8"
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /salvar vp8/i })
+    ).toBeInTheDocument();
+  });
 });

@@ -49,8 +49,8 @@ function App() {
     <div
       className={
         isCameraView
-          ? 'h-screen w-screen overflow-hidden bg-transparent text-white'
-          : 'h-screen w-screen overflow-auto bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.08),transparent_24%),#07090d] text-white'
+          ? 'app-shell h-screen w-screen'
+          : 'app-shell h-screen w-screen overflow-auto bg-[var(--bg-base)]'
       }
     >
       {isCameraView && <CameraOverlay />}

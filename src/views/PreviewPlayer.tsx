@@ -25,6 +25,7 @@ interface PreviewPlayerProps {
   onCancel: () => void;
   isSaving: boolean;
   saveError?: string | null;
+  initialFormat?: VideoFormat;
 }
 
 const PreviewPlayer = ({
@@ -33,17 +34,21 @@ const PreviewPlayer = ({
   onCancel,
   isSaving,
   saveError,
+  initialFormat = 'mp4',
 }: PreviewPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isResolvingDurationRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState<VideoFormat>('webm-vp9');
+  const [selectedFormat, setSelectedFormat] =
+    useState<VideoFormat>(initialFormat);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [resolution, setResolution] = useState('');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const videoUrl = useMemo(() => URL.createObjectURL(videoBlob), [videoBlob]);
+
+  const noDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 
   useEffect(() => {
     return () => URL.revokeObjectURL(videoUrl);
@@ -145,41 +150,43 @@ const PreviewPlayer = ({
     f === 'webm-vp9' ? 'VP9' : f === 'webm-vp8' ? 'VP8' : 'MP4';
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[linear-gradient(160deg,rgba(10,12,17,0.99),rgba(6,8,12,0.99))]">
-      {/* Header */}
-      <div
-        className="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-2.5"
+    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg-base)]">
+      <header
+        className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3"
         style={{ WebkitAppRegion: 'drag' } as CSSProperties}
       >
-        <div className="flex items-center gap-2.5">
-          <div className="rounded-[12px] border border-cyan-300/20 bg-cyan-300/10 p-1.5">
-            <Video className="h-4 w-4 text-cyan-200" />
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-control border border-[var(--accent-border)] bg-[var(--accent-muted)]">
+            <Video className="h-4 w-4 text-indigo-200" />
           </div>
-          <span className="text-sm font-semibold text-white">
-            Preview da Gravação
-          </span>
-          {resolution && (
-            <span className="text-xs text-slate-500">{resolution}</span>
-          )}
-          <span className="text-xs text-slate-500">{sizeLabel()}</span>
-          {duration > 0 && (
-            <span className="text-xs text-slate-500">
-              {formatTime(duration)}
+          <div>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
+              Preview da gravação
             </span>
-          )}
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              {resolution && <span>{resolution}</span>}
+              {resolution && <span>·</span>}
+              <span>{sizeLabel()}</span>
+              {duration > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{formatTime(duration)}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
         <button
           onClick={() => !isSaving && setShowDiscardConfirm(true)}
-          style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
-          className="rounded-full border border-white/10 bg-white/[0.04] p-1.5 text-slate-400 transition hover:bg-white/[0.08]"
+          style={noDrag}
+          className="btn-ghost p-2"
           title="Fechar (ESC)"
           aria-label="Fechar preview"
         >
           <X className="h-4 w-4" />
         </button>
-      </div>
+      </header>
 
-      {/* Video */}
       <div className="min-h-0 flex-1 overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -203,10 +210,9 @@ const PreviewPlayer = ({
         />
       </div>
 
-      {/* Seek bar */}
-      <div className="shrink-0 border-t border-white/6 px-4 py-2">
+      <div className="shrink-0 border-t border-[var(--border-subtle)] px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <span className="w-10 text-right font-mono text-[11px] text-slate-400">
+          <span className="w-10 text-right font-mono text-[11px] tabular-nums text-[var(--text-muted)]">
             {formatTime(currentTime)}
           </span>
           <div className="relative flex-1">
@@ -218,31 +224,29 @@ const PreviewPlayer = ({
               step="0.1"
               onChange={(e) => handleSeek(Number(e.target.value))}
               aria-label="Posição do vídeo"
-              className="relative z-10 w-full cursor-pointer bg-transparent"
-              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+              className="range-track relative z-10"
+              style={noDrag}
             />
-            <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-[var(--bg-muted)]" />
             <div
-              className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-cyan-300"
+              className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--accent)]"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <span className="w-10 font-mono text-[11px] text-slate-500">
+          <span className="w-10 font-mono text-[11px] tabular-nums text-[var(--text-muted)]">
             {formatTime(duration || 0)}
           </span>
         </div>
       </div>
 
-      {/* Controls bar */}
-      <div
-        className="flex shrink-0 items-center gap-3 border-t border-white/8 px-4 py-2.5"
-        style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+      <footer
+        className="flex shrink-0 flex-wrap items-center gap-2.5 border-t border-[var(--border-subtle)] px-4 py-3"
+        style={noDrag}
       >
-        {/* Playback controls */}
-        <div className="flex items-center gap-1 rounded-[16px] border border-white/8 bg-white/[0.04] p-1">
+        <div className="surface-inset flex items-center gap-1 p-1">
           <button
             onClick={() => handleSkip(-10)}
-            className="flex items-center gap-1 rounded-[12px] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08]"
+            className="btn-ghost px-2.5 py-1.5 text-xs"
             title="Voltar 10s"
           >
             <Rewind className="h-3.5 w-3.5" />
@@ -250,11 +254,7 @@ const PreviewPlayer = ({
           </button>
           <button
             onClick={handlePlayPause}
-            className={`flex items-center gap-1.5 rounded-[12px] px-3.5 py-1.5 text-xs font-semibold transition ${
-              isPlaying
-                ? 'bg-[linear-gradient(135deg,#FF5D73,#D92D4A)] text-white'
-                : 'bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] text-slate-950'
-            }`}
+            className={`btn px-3 py-1.5 text-xs ${isPlaying ? 'btn-stop' : 'btn-record'}`}
           >
             {isPlaying ? (
               <Pause className="h-3.5 w-3.5" />
@@ -265,7 +265,7 @@ const PreviewPlayer = ({
           </button>
           <button
             onClick={() => handleSkip(10)}
-            className="flex items-center gap-1 rounded-[12px] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08]"
+            className="btn-ghost px-2.5 py-1.5 text-xs"
             title="Avançar 10s"
           >
             10s
@@ -273,10 +273,9 @@ const PreviewPlayer = ({
           </button>
         </div>
 
-        {/* Mute */}
         <button
           onClick={() => setIsMuted((m) => !m)}
-          className="rounded-[12px] border border-white/10 bg-white/[0.04] p-2 text-slate-300 transition hover:bg-white/[0.08]"
+          className="btn-ghost p-2"
           title={isMuted ? 'Ativar áudio' : 'Silenciar'}
         >
           {isMuted ? (
@@ -288,20 +287,20 @@ const PreviewPlayer = ({
 
         <div className="flex-1" />
 
-        {saveError && (
-          <span className="text-xs text-rose-300">{saveError}</span>
-        )}
+        {saveError && <span className="text-xs text-red-300">{saveError}</span>}
 
-        {/* Format selector */}
-        <div className="flex items-center gap-1 rounded-[16px] border border-white/8 bg-white/[0.04] p-1">
+        <div className="surface-inset flex items-center gap-0.5 p-1">
           {(['webm-vp9', 'webm-vp8', 'mp4'] as VideoFormat[]).map((fmt) => (
             <button
               key={fmt}
+              type="button"
+              data-testid={`preview-format-${fmt}`}
               onClick={() => setSelectedFormat(fmt)}
-              className={`rounded-[12px] px-3 py-1.5 text-xs font-semibold transition ${
+              style={noDrag}
+              className={`btn px-3 py-1.5 text-xs ${
                 selectedFormat === fmt
-                  ? 'border border-cyan-300/25 bg-cyan-300/14 text-cyan-50'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'btn-accent'
+                  : 'border-transparent bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
             >
               {formatLabel(fmt)}
@@ -309,20 +308,18 @@ const PreviewPlayer = ({
           ))}
         </div>
 
-        {/* Discard */}
         <button
           onClick={() => !isSaving && setShowDiscardConfirm(true)}
           disabled={isSaving}
-          className="rounded-[14px] border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-50"
+          className="btn-ghost px-3 py-2 text-xs"
         >
           Descartar
         </button>
 
-        {/* Save */}
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="flex items-center gap-1.5 rounded-[14px] bg-[linear-gradient(135deg,#6EE7F9,#35B8D6)] px-4 py-2 text-xs font-bold text-slate-950 shadow-[0_8px_20px_rgba(110,231,249,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-record px-4 py-2 text-xs"
         >
           <Download className="h-3.5 w-3.5" />
           {isSaving
@@ -331,40 +328,39 @@ const PreviewPlayer = ({
               : 'Salvando...'
             : `Salvar ${formatLabel(selectedFormat)}`}
         </button>
-      </div>
+      </footer>
 
-      {/* Discard confirm */}
       {showDiscardConfirm && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="discard-dialog-title"
         >
-          <div className="w-full max-w-xs rounded-[20px] border border-white/10 bg-[rgba(12,15,20,0.98)] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
+          <div className="surface w-full max-w-sm p-5 shadow-panel">
             <h3
               id="discard-dialog-title"
-              className="text-base font-semibold text-white"
+              className="text-base font-semibold text-[var(--text-primary)]"
             >
               Descartar gravação?
             </h3>
-            <p className="mt-1.5 text-sm text-slate-400">
+            <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
               A gravação não foi salva e será perdida permanentemente.
             </p>
-            <div className="mt-4 flex gap-2.5">
+            <div className="mt-4 flex gap-2">
               <button
                 onClick={() => {
                   setShowDiscardConfirm(false);
                   onCancel();
                 }}
-                className="flex-1 rounded-[14px] border border-[#FF5D73]/40 bg-[#FF5D73]/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-[#FF5D73]/16"
+                className="btn-stop flex-1 py-2.5 text-sm"
               >
                 Descartar
               </button>
               <button
                 onClick={() => setShowDiscardConfirm(false)}
                 autoFocus
-                className="flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[0.10]"
+                className="btn-ghost flex-1 py-2.5 text-sm"
               >
                 Continuar
               </button>

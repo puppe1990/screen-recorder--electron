@@ -10,7 +10,9 @@
     "dev:watch:main": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",
     "dev:watch:preload": "tsc -p electron/preload.tsconfig.json --watch --preserveWatchOutput",
     "build": "tsc -b && vite build",
-    "precommit:check": "npm run lint && npm run test",
+    "typecheck": "tsc -b --noEmit && tsc -p electron/tsconfig.json --noEmit && tsc -p electron/preload.tsconfig.json --noEmit",
+    "ci": "npm run typecheck && npm run lint && npm run test && npm run electron:build",
+    "precommit:check": "npm run typecheck && npm run lint && npm run test",
     "lint": "eslint . && npm run format:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -63,6 +65,9 @@
     "vite": "^7.2.4",
     "vitest": "^3.2.4",
     "wait-on": "^9.0.3"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "simple-git-hooks": {
     "pre-commit": "npm run precommit:check"
